@@ -33,6 +33,7 @@ class SymbRegTree(gp.PrimitiveTree):
         super().__init__(content)
         self.values = []
         self.error_vec = None
+        self.func = None
 
     def __deepcopy__(self, memo):
         new = self.__class__(self)
@@ -43,17 +44,17 @@ class SymbRegTree(gp.PrimitiveTree):
                 setattr(new, k, copy.deepcopy(v))
         return new
 
-    def eval_at_points(self, points, compile_func):
-        func = compile_func(self)
-        if len(self.values) != len(points):
-            self.values = [0] * len(points)
-        for i, p in enumerate(points):
-            self.values[i] = func(p)
+    def set_values(self, points, compile_func):
+        self.func = compile_func(self)
+        self.values = [self.func(p) for p in points]
 
     def set_error_vec(self, target_values):
         assert(len(self.values) == len(target_values))
         self.error_vec = target_values - self.values
 
+    def eval_at_points(self, points):
+        assert(self.fitness.valid)
+        return [self.func(p) for p in points]
 
 def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
     assert(len(population) % 2 == 0)
@@ -90,7 +91,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
         # evaluate, get errors and fitnesses
         target_values = np.array([toolbox.target_func(x) for x in points])
         for ind in invalid_ind:
-            ind.eval_at_points(points, toolbox.compile)
+            ind.set_values(points, toolbox.compile)
             nevals += len(points)
             ind.set_error_vec(target_values)
             ind.fitness.values = toolbox.evaluate(ind.error_vec)
@@ -124,7 +125,7 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
     nevals = 0
     for ind in invalid_ind:
         nevals += len(points)
-        ind.eval_at_points(points, toolbox.compile)
+        ind.set_values(points, toolbox.compile)
         ind.set_error_vec(target_values)
         ind.fitness.values = toolbox.evaluate(ind.error_vec)
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False), nevals
@@ -135,8 +136,8 @@ def target_func(x):
 def symbreg_fitness(errors):
     return math.fsum(map(abs, errors)) / len(errors),
 
-def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, points, stats=None,
-                     halloffame=None, verbose=__debug__):
+def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, training_set, test_set, halloffame,
+                     stats=None, verbose=__debug__):
 
     def _terminate():
         vars = [gen, evals, time, best_fitness]
@@ -153,6 +154,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, p
 
     last_predictor = None
 
+    test_set_target = np.array([toolbox.target_func(p) for p in test_set])
+
     # Begin the generational process
     while not _terminate():
         gen += 1
@@ -164,27 +167,36 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, p
                 del ind.fitness.values
         last_predictor = predictor
         # crossover, mutation and selection
-        offspring, nevals = toolbox.new_gen(population=population, points=points[predictor])
+        offspring, nevals = toolbox.new_gen(population=population, points=training_set[predictor])
         evals += nevals
 
         population[:] = offspring
+
+        # Update the hall of fame with the generated individuals
+        halloffame.update(population)
+
+        # get test_set fitness
+        best_ind = halloffame[0]
+        vals = best_ind.eval_at_points(test_set)
+        test_set_f = toolbox.evaluate(test_set_target - vals)[0]
+
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, nevals=nevals, **record)
+        logbook.record(gen=gen, nevals=nevals, test_set_f=test_set_f, **record)
 
         if verbose:
             print(logbook.stream)
 
-        # Update the hall of fame with the generated individuals
-        if halloffame is not None:
-            halloffame.update(population)
 
     return population, logbook
 
 CXPB = 0.5
 MUTPB = 0.1
 POP_SIZE = 128
-POINTS = np.linspace(-3, 3, 200)
+TRAINING_SET = np.linspace(-3, 3, 200)
+_a = np.min(TRAINING_SET)
+_b = np.max(TRAINING_SET)
+TEST_SET = np.concatenate([TRAINING_SET, np.random.uniform(_a, _b, 200)])
 
 def symb_reg_initialize():
     # initialization
@@ -209,16 +221,20 @@ def symb_reg_initialize():
     mstats.register("min", np.min)
     mstats.register("max", np.max)
 
-
     return mstats
 
-if __name__ == '__main__':
-    random.seed(69)
+def run(end_cond, end_func, fitness_predictor='exact'):
     stats = symb_reg_initialize()
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
-    ngens = 20
-    pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, 'evals', lambda x: x >= 1e6,
-                                fitness_pred.ExactFitness(len(POINTS)), POINTS, stats=stats,
-                                halloffame=hof, verbose=False)
-    print(hof[0].fitness.values)
+
+    predictors = {'exact' : fitness_pred.ExactFitness(len(TRAINING_SET))}
+
+    pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
+                                predictors[fitness_predictor], TRAINING_SET, TEST_SET, halloffame=hof,
+                                stats=stats, verbose=False)
+
+    return pop, log, hof
+
+if __name__ == '__main__':
+    pass
