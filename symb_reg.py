@@ -41,7 +41,6 @@ class SymbRegTree(gp.PrimitiveTree):
                 setattr(new, k, v)
             else:
                 setattr(new, k, copy.deepcopy(v))
-        #new.__dict__.update(copy.deepcopy(self.__dict__, memo))
         return new
 
     def eval_at_points(self, points, compile_func):
@@ -152,13 +151,18 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, p
     start_time = time.time()
     best_fitness = (np.inf,)
 
+    last_predictor = None
 
     # Begin the generational process
     while not _terminate():
         gen += 1
         # get points to use
         predictor = fp.get_best_predictor()
-
+        # if we use new predictor, we have to re-evaluate the population
+        if last_predictor is not None and sorted(predictor) != sorted(last_predictor):
+            for ind in pop:
+                del ind.fitness.values
+        last_predictor = predictor
         # crossover, mutation and selection
         offspring, nevals = toolbox.new_gen(population=population, points=points[predictor])
         evals += nevals
@@ -166,7 +170,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, p
         population[:] = offspring
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, nevals=nevals / len(points), **record)
+        logbook.record(gen=gen, nevals=nevals, **record)
 
         if verbose:
             print(logbook.stream)
@@ -214,7 +218,7 @@ if __name__ == '__main__':
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
     ngens = 20
-    pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, 'gen', lambda x: x >= ngens,
+    pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, 'evals', lambda x: x >= 1e6,
                                 fitness_pred.ExactFitness(len(POINTS)), POINTS, stats=stats,
-                                halloffame=hof, verbose=True)
+                                halloffame=hof, verbose=False)
     print(hof[0].fitness.values)
