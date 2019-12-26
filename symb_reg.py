@@ -21,14 +21,39 @@ from deap import creator
 
 class SymbRegTree(gp.PrimitiveTree):
 
+    '''
+    list of atributes that aren't copied during deepcopy
+    it is a significant important speedup of the program
+    there is no reason to copy these attributes because
+    for individuals with invalid fitness they are computed again
+    '''
+    deepcopy_ignorelist = ('values', 'error_vec')
+
     def __init__(self, content):
         super().__init__(content)
+        self.values = []
+        self.error_vec = None
 
+    def __deepcopy__(self, memo):
+        new = self.__class__(self)
+        for k, v in self.__dict__.items():
+            if k in SymbRegTree.deepcopy_ignorelist:
+                setattr(new, k, v)
+            else:
+                setattr(new, k, copy.deepcopy(v))
+        #new.__dict__.update(copy.deepcopy(self.__dict__, memo))
+        return new
 
-    def eval_at_points(self, points, compile_func, out):
+    def eval_at_points(self, points, compile_func):
         func = compile_func(self)
+        if len(self.values) != len(points):
+            self.values = [0] * len(points)
         for i, p in enumerate(points):
-            out[i] = func(p)
+            self.values[i] = func(p)
+
+    def set_error_vec(self, target_values):
+        assert(len(self.values) == len(target_values))
+        self.error_vec = target_values - self.values
 
 
 def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
@@ -38,7 +63,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
     random.shuffle(parents)
     tree_values = np.zeros((4, len(points)))
     error_vectors = np.zeros_like(tree_values)
-    m = max([p.height for p in parents])
+    nevals = 0
     for i in range(1, len(parents), 2):
         p1, p2 = toolbox.map(toolbox.clone, (parents[i - 1], parents[i]))
         # crossover
@@ -60,19 +85,20 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
             c2, = toolbox.mutate(c2)
             del c2.fitness.values
         family = (p1, p2, c1, c2)
-
+        invalid_ind = (ind for ind in family if not ind.fitness.valid)
         family_idx = {'p1' : 0, 'p2' : 1, 'c1' : 2, 'c2' : 3}
         # selection
         # evaluate, get errors and fitnesses
         target_values = np.array([toolbox.target_func(x) for x in points])
-        for j, ind in enumerate(family):
-            ind.eval_at_points(points, toolbox.compile, tree_values[j])
-            error_vectors[j] = target_values - tree_values[j]
-            ind.fitness.values = toolbox.evaluate(error_vectors[j])
+        for ind in invalid_ind:
+            ind.eval_at_points(points, toolbox.compile)
+            nevals += len(points)
+            ind.set_error_vec(target_values)
+            ind.fitness.values = toolbox.evaluate(ind.error_vec)
         # select new individuals according to rules from 'the paper'
         # phenotypic distance
-        dist = lambda ind1, ind2: np.linalg.norm(error_vectors[family_idx[ind1]] \
-                                               - error_vectors[family_idx[ind2]])
+        dist = lambda ind1, ind2: np.linalg.norm(family[family_idx[ind1]].error_vec \
+                                               - family[family_idx[ind2]].error_vec)
         tournament = []
         if dist('p1', 'c1') + dist('p2', 'c2') <= dist('p1', 'c2') + dist('p2', 'c1'):
             tournament.append((c1, p1))
@@ -88,7 +114,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
 
     assert(len(offspring) == len(population))
     # new generation
-    return offspring
+    return offspring, nevals
 
 def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_size, parsimony_size):
     offspring = algorithms.varAnd(population, toolbox, cxpb, mutpb)
@@ -99,8 +125,9 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
     nevals = 0
     for ind in invalid_ind:
         nevals += len(points)
-        ind.eval_at_points(points, toolbox.compile, ind_values)
-        ind.fitness.values = toolbox.evaluate(target_values - ind_values)
+        ind.eval_at_points(points, toolbox.compile)
+        ind.set_error_vec(target_values)
+        ind.fitness.values = toolbox.evaluate(ind.error_vec)
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False), nevals
 
 def target_func(x):
@@ -139,7 +166,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, p
         population[:] = offspring
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, **record)
+        logbook.record(gen=gen, nevals=nevals / len(points), **record)
 
         if verbose:
             print(logbook.stream)
@@ -164,8 +191,8 @@ def symb_reg_initialize():
     toolbox.register("compile", gp.compile, pset=pset)
     toolbox.register("evaluate", symbreg_fitness)
     toolbox.register("target_func", target_func)
-    #toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
-    toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
+    toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
+    #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
 
 
     # stats we want to keep track of
@@ -182,12 +209,12 @@ def symb_reg_initialize():
     return mstats
 
 if __name__ == '__main__':
-    #random.seed(420)
+    random.seed(69)
     stats = symb_reg_initialize()
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
-    ngens = 200
+    ngens = 20
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, 'gen', lambda x: x >= ngens,
                                 fitness_pred.ExactFitness(len(POINTS)), POINTS, stats=stats,
-                                halloffame=hof, verbose=False)
+                                halloffame=hof, verbose=True)
     print(hof[0].fitness.values)
