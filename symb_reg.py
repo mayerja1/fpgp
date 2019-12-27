@@ -44,8 +44,15 @@ class SymbRegTree(gp.PrimitiveTree):
                 setattr(new, k, copy.deepcopy(v))
         return new
 
-    def set_values(self, points, compile_func):
+    def make_invalid(self):
+        del self.fitness.values
+        self.func = None
+
+    def set_func(self, compile_func):
         self.func = compile_func(self)
+
+    def set_values(self, points, compile_func):
+        self.set_func(compile_func)
         self.values = [self.func(p) for p in points]
 
     def set_error_vec(self, target_values):
@@ -53,7 +60,7 @@ class SymbRegTree(gp.PrimitiveTree):
         self.error_vec = target_values - self.values
 
     def eval_at_points(self, points):
-        assert(self.fitness.valid)
+        assert(self.func is not None)
         return [self.func(p) for p in points]
 
 def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
@@ -69,7 +76,8 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
         # crossover
         c1, c2 = toolbox.mate(p1, p2)
         # make crossovered individuals' fitnesses invalid
-        del c1.fitness.values, c2.fitness.values
+        c1.make_invalid()
+        c2.make_invalid()
         # p1 and p2 are crossed over, we need to get back to their originals
         p1, p2 = parents[i - 1], parents[i]
 
@@ -80,10 +88,10 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
         # mutate
         if random.random() < mutpb:
             c1, = toolbox.mutate(c1)
-            del c1.fitness.values
+            c1.make_invalid()
         if random.random() < mutpb:
             c2, = toolbox.mutate(c2)
-            del c2.fitness.values
+            c2.make_invalid()
         family = (p1, p2, c1, c2)
         invalid_ind = (ind for ind in family if not ind.fitness.valid)
         family_idx = {'p1' : 0, 'p2' : 1, 'c1' : 2, 'c2' : 3}
@@ -136,12 +144,21 @@ def target_func(x):
 def symbreg_fitness(errors):
     return math.fsum(map(abs, errors)) / len(errors),
 
+def individual_fitness(ind, points, target, toolbox):
+    '''
+    get fitness of an individual without changing its inner state
+    individuals set_func() has to have been called before
+    '''
+    vals = ind.eval_at_points(points)
+    return toolbox.evaluate(target - vals)
+
+
 def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, training_set, test_set, halloffame,
                      stats=None, verbose=__debug__):
 
     def _terminate():
-        vars = [gen, evals, time, best_fitness]
-        vars_name_mapping = {'gen' : gen, 'evals' : evals, 'time' : time.time() - start_time, 'best_fitness' : best_fitness}
+        vars_name_mapping = {'gen' : gen, 'evals' : evals, 'time' : time.time() - start_time, \
+            'best_fitness' : halloffame[0].fitness.values if len(halloffame) > 0 else np.inf}
         return end_func(vars_name_mapping[end_cond])
 
     logbook = tools.Logbook()
@@ -149,28 +166,37 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     gen = 0
     evals = 0
+    pred_evals = 0
     start_time = time.time()
-    best_fitness = (np.inf,)
 
     last_predictor = None
 
     test_set_target = np.array([toolbox.target_func(p) for p in test_set])
+    train_set_target = np.array([toolbox.target_func(p) for p in training_set])
+
+    # set functions of first generation, needed for predictor initialization
+    for ind in population: ind.set_func(toolbox.compile)
 
     # Begin the generational process
     while not _terminate():
         gen += 1
         # get points to use
-        predictor, nevals = fp.get_best_predictor()
+        nevals = fp.next_generation(gen=gen, pop=population, training_set=training_set, \
+                                    target_values=train_set_target, toolbox=toolbox, \
+                                    effort=pred_evals / evals if evals != 0 else 0)
+
+        predictor = fp.get_best_predictor()
+        pred_evals += nevals
         evals += nevals
         # if we use new predictor, we have to re-evaluate the population
         if last_predictor is not None and sorted(predictor) != sorted(last_predictor):
-            for ind in pop:
-                del ind.fitness.values
+            for ind in population:
+                ind.make_invalid()
         last_predictor = predictor
         # crossover, mutation and selection
         offspring, nevals = toolbox.new_gen(population=population, points=training_set[predictor])
         evals += nevals
-
+        #print(pred_evals / (evals))
         population[:] = offspring
 
         # Update the hall of fame with the generated individuals
@@ -183,11 +209,10 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, nevals=nevals, test_set_f=test_set_f, **record)
+        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f, **record)
 
         if verbose:
             print(logbook.stream)
-
 
     return population, logbook
 
@@ -197,7 +222,8 @@ POP_SIZE = 128
 TRAINING_SET = np.linspace(-3, 3, 200)
 _a = np.min(TRAINING_SET)
 _b = np.max(TRAINING_SET)
-TEST_SET = np.concatenate([TRAINING_SET, np.random.uniform(_a, _b, 200)])
+TEST_SET = np.append(TRAINING_SET, np.random.uniform(_a, _b, 200))
+
 
 def symb_reg_initialize():
     # initialization
@@ -207,6 +233,7 @@ def symb_reg_initialize():
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("compile", gp.compile, pset=pset)
     toolbox.register("evaluate", symbreg_fitness)
+    toolbox.register("individual_fitness", individual_fitness)
     toolbox.register("target_func", target_func)
     toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
     #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
@@ -229,7 +256,8 @@ def run(end_cond, end_func, fitness_predictor='exact'):
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
-    predictors = {'exact' : fitness_pred.ExactFitness(len(TRAINING_SET))}
+    predictors = {'exact' : fitness_pred.ExactFitness(len(TRAINING_SET)), \
+                  'SchmidLipson' : fitness_pred.SchmidLipsonFPManager(len(TRAINING_SET))}
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
                                 predictors[fitness_predictor], TRAINING_SET, TEST_SET, halloffame=hof,
@@ -238,4 +266,5 @@ def run(end_cond, end_func, fitness_predictor='exact'):
     return pop, log, hof
 
 if __name__ == '__main__':
-    pass
+    _, log, hof = run('gen', lambda x: x >= 200, fitness_predictor='SchmidLipson')
+    print(log[-1])

@@ -1,44 +1,46 @@
+import random
+import math
 import numpy as np
-from copy import copy
+import copy
 
 class FitnessPredictor():
 
-    def __init__(self, number_of_tests, size, test_cases=None):
-        self.number_of_tests = number_of_tests
+    def __init__(self, training_set_size, size, test_cases=None):
+        self.training_set_size = training_set_size
         self.test_cases = test_cases
         self.size = size
         if test_cases is None:
             self.random_predictor()
 
     def random_predictor(self):
-        self.test_cases = np.random.randint(self.number_of_tests, size=self.size)
+        self.test_cases = np.random.randint(self.training_set_size, size=self.size)
 
     def __str__(self):
         return str(self.test_cases)
 
 class EvolvingFitnessPredictor(FitnessPredictor):
 
-    def __init__(self, number_of_tests, size, prob_mutation, prob_xo, test_cases=None):
-        super().__init__(number_of_tests, size, test_cases=test_cases)
-        self.prob_xo = prob_xo
-        self.prob_mutation = prob_mutation
+    def __init__(self, training_set_size, size, mutpb, cxpb, test_cases=None):
+        super().__init__(training_set_size, size, test_cases=test_cases)
+        self.cxpb = cxpb
+        self.mutpb = mutpb
 
     def mutate(self):
         for i in range(self.size):
-            if random() < self.prob_mutation:
-                self.test_cases[i] = randint(0, self.number_of_tests - 1)
+            if random.random() < self.mutpb:
+                self.test_cases[i] = random.randint(0, self.training_set_size - 1)
 
     def crossover(self, other):
         if self.size != other.size:
             raise ValueError('predictors must have same size')
-        if random() < self.prob_xo:
-            xo_point = randint(0, self.size - 1)
+        if random.random() < self.cxpb:
+            xo_point = random.randint(0, self.size - 1)
             self.test_cases[:xo_point] = other.test_cases[:xo_point]
 
 class FitnessPredictorManager():
 
-    def __init__(self, dataset_size):
-        self.dataset_size = dataset_size
+    def __init__(self, training_set_size):
+        self.training_set_size = training_set_size
 
     def get_best_predictor(self):
         raise NotImplementedError()
@@ -48,12 +50,118 @@ class FitnessPredictorManager():
 
 class ExactFitness(FitnessPredictorManager):
 
-    def __init__(self, dataset_size):
-        super().__init__(dataset_size)
-        self.points = np.arange(self.dataset_size, dtype=np.int32)
+    def __init__(self, training_set_size):
+        super().__init__(training_set_size)
+        self.points = np.arange(self.training_set_size, dtype=np.int32)
 
     def get_best_predictor(self):
-        return self.points, 0
+        return self.points
 
     def next_generation(self, **kwargs):
-        pass
+        return 0
+
+class SchmidLipsonFPManager(FitnessPredictorManager):
+
+    def __init__(self, training_set_size, predictors_size=8, num_predictors=8,
+                 mutpb=0.1, cxpb=0.5, num_trainers=10):
+        self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb) \
+                              for _ in range(num_predictors)]
+        #self.predictors_fitnesses = [0] * num_predictors
+        self.trainers_pop = [None] * num_trainers
+        self.trainers_fitness = [0] * num_trainers
+        self.pred_evolution_gen = 0
+        self.best_pred = None
+        self.best_pred_f = -np.inf
+
+    def get_best_predictor(self):
+        return self.best_pred.test_cases
+
+    def next_generation(self, **kwargs):
+        nevals = 0
+        # first call of the function
+        if self.trainers_pop[0] is None:
+            # random trainers
+            self.trainers_pop = [copy.deepcopy(random.choice(kwargs['pop'])) for _ in range(len(self.trainers_pop))]
+            # get exact fitness
+            for i, t in enumerate(self.trainers_pop):
+                self.trainers_fitness[i] = kwargs['toolbox'].individual_fitness(t, kwargs['training_set'], \
+                                                     kwargs['target_values'], kwargs['toolbox'])[0]
+                nevals += len(kwargs['training_set'])
+        if kwargs['effort'] <= 0.05:
+            self.pred_evolution_gen += 1
+            nevals += self.deterministic_crowding(kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
+            # add  new trainer every 100 predictor generations
+            if self.pred_evolution_gen % 100 == 0:
+                nevals += self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
+
+        return nevals
+
+
+    def deterministic_crowding(self, training_set, target_values, toolbox):
+        assert(len(self.predictor_pop) % 2 == 0)
+        parents = [copy.deepcopy(p) for p in self.predictor_pop]
+        offspring = []
+        random.shuffle(parents)
+        nevals = 0
+        for i in range(1, len(parents), 2):
+            p1, p2 = parents[i - 1], parents[i]
+            c1, c2 = map(copy.deepcopy, (p1, p2))
+            c1.crossover(p2)
+            c2.crossover(p1)
+            c1.mutate()
+            c2.mutate()
+            # we define distance as number of different test_cases
+            dist = lambda x, y: len(set(x.test_cases) ^ set(y.test_cases))
+            fitnesses = {p : -self.predictor_fitness(p, training_set, target_values, toolbox) for p in (p1, p2, c1, c2)}
+            nevals += 4 * len(self.trainers_pop) * len(self.predictor_pop[0].test_cases)
+            tournament = []
+            if dist(p1, c1) + dist(p2, c2) <= dist(p1, c2) + dist(p2, c1):
+                tournament.append((c1, p1))
+                tournament.append((c2, p2))
+            else:
+                tournament.append((c2, p1))
+                tournament.append((c1, p2))
+            for x, y in tournament:
+                if fitnesses[x] > fitnesses[y]:
+                    offspring.append(x)
+                else:
+                    offspring.append(y)
+                # if we found new best predictor
+                if fitnesses[offspring[-1]] > self.best_pred_f:
+                    self.best_pred = copy.deepcopy(offspring[-1])
+                    self.best_pred_f = fitnesses[offspring[-1]]
+
+            self.predictor_pop = offspring
+
+        return nevals
+
+    def predictor_fitness(self, p, training_set, target_values, toolbox):
+        predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
+                               for t in self.trainers_pop]
+        # negative so that we want to find maximal fitness
+        return -math.fsum(map(lambda x: abs(x[0] - x[1]), zip(predicted_fitnesses, self.trainers_fitness))) / len(self.trainers_pop)
+
+    def add_fitness_trainer(self, pop, training_set, target_values, toolbox):
+        nevals = 0
+        trainers_variances = [0] * len(self.trainers_pop)
+        for i, t in enumerate(self.trainers_pop):
+            predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
+                                   for p in self.predictor_pop]
+            nevals += len(self.predictor_pop) * len(self.predictor_pop[0].test_cases)
+            trainers_variances[i] = np.var(predicted_fitnesses)
+
+        solutions_variances = [0] * len(pop)
+        for i, s in enumerate(pop):
+            predicted_fitnesses = [toolbox.individual_fitness(s, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
+                                   for p in self.predictor_pop]
+            nevals += len(self.predictor_pop) * len(self.predictor_pop[0].test_cases)
+            solutions_variances[i] = np.var(predicted_fitnesses)
+
+        if max(solutions_variances) > min(trainers_variances):
+            new_trainer = copy.deepcopy(pop[np.argmax(solutions_variances)])
+            worst_trainer_idx = np.argmin(trainers_variances)
+            self.trainers_pop[worst_trainer_idx] = new_trainer
+            self.trainers_fitness[worst_trainer_idx] = toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0]
+            nevals += len(training_set)
+
+        return nevals
