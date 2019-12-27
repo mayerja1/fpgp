@@ -53,7 +53,7 @@ class ExactFitness(FitnessPredictorManager):
         self.points = np.arange(self.dataset_size, dtype=np.int32)
 
     def get_best_predictor(self):
-        return self.points
+        return self.points, 0
 
     def next_generation(self, **kwargs):
         pass

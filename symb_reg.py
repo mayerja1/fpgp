@@ -160,7 +160,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
     while not _terminate():
         gen += 1
         # get points to use
-        predictor = fp.get_best_predictor()
+        predictor, nevals = fp.get_best_predictor()
+        evals += nevals
         # if we use new predictor, we have to re-evaluate the population
         if last_predictor is not None and sorted(predictor) != sorted(last_predictor):
             for ind in pop:
