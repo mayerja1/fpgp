@@ -144,6 +144,7 @@ class SchmidLipsonFPManager(FitnessPredictorManager):
 
     def add_fitness_trainer(self, pop, training_set, target_values, toolbox):
         nevals = 0
+        solutions_variances = np.zeros(len(pop))
         for i, s in enumerate(pop):
             predicted_fitnesses = [toolbox.individual_fitness(s, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
                                    for p in self.predictor_pop]
