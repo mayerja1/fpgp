@@ -2,6 +2,7 @@ import random
 import math
 import numpy as np
 import copy
+from collections import deque
 
 class FitnessPredictor():
 
@@ -68,7 +69,7 @@ class SchmidLipsonFPManager(FitnessPredictorManager):
                               for _ in range(num_predictors)]
         #self.predictors_fitnesses = [0] * num_predictors
         self.trainers_pop = [None] * num_trainers
-        self.trainers_fitness = [0] * num_trainers
+        self.trainers_fitness = deque([0] * num_trainers)
         self.pred_evolution_gen = 0
         self.best_pred = None
         self.best_pred_f = -np.inf
@@ -81,7 +82,7 @@ class SchmidLipsonFPManager(FitnessPredictorManager):
         # first call of the function
         if self.trainers_pop[0] is None:
             # random trainers
-            self.trainers_pop = [copy.deepcopy(random.choice(kwargs['pop'])) for _ in range(len(self.trainers_pop))]
+            self.trainers_pop = deque([copy.deepcopy(random.choice(kwargs['pop'])) for _ in range(len(self.trainers_pop))])
             # get exact fitness
             for i, t in enumerate(self.trainers_pop):
                 self.trainers_fitness[i] = kwargs['toolbox'].individual_fitness(t, kwargs['training_set'], \
@@ -143,25 +144,17 @@ class SchmidLipsonFPManager(FitnessPredictorManager):
 
     def add_fitness_trainer(self, pop, training_set, target_values, toolbox):
         nevals = 0
-        trainers_variances = [0] * len(self.trainers_pop)
-        for i, t in enumerate(self.trainers_pop):
-            predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
-                                   for p in self.predictor_pop]
-            nevals += len(self.predictor_pop) * len(self.predictor_pop[0].test_cases)
-            trainers_variances[i] = np.var(predicted_fitnesses)
-
-        solutions_variances = [0] * len(pop)
         for i, s in enumerate(pop):
             predicted_fitnesses = [toolbox.individual_fitness(s, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
                                    for p in self.predictor_pop]
             nevals += len(self.predictor_pop) * len(self.predictor_pop[0].test_cases)
             solutions_variances[i] = np.var(predicted_fitnesses)
 
-        if max(solutions_variances) > min(trainers_variances):
-            new_trainer = copy.deepcopy(pop[np.argmax(solutions_variances)])
-            worst_trainer_idx = np.argmin(trainers_variances)
-            self.trainers_pop[worst_trainer_idx] = new_trainer
-            self.trainers_fitness[worst_trainer_idx] = toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0]
-            nevals += len(training_set)
-
+        # select best one from the population and replace the oldest trainer
+        self.trainers_pop.pop()
+        self.trainers_fitness.pop()
+        new_trainer = copy.deepcopy(pop[np.argmax(solutions_variances)])
+        self.trainers_pop.appendleft(new_trainer)
+        self.trainers_fitness.appendleft(toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0])
+        nevals += len(training_set)
         return nevals
