@@ -23,7 +23,7 @@ class SymbRegTree(gp.PrimitiveTree):
 
     '''
     list of atributes that aren't copied during deepcopy
-    it is a significant important speedup of the program
+    it is a significant speedup of the program
     there is no reason to copy these attributes because
     for individuals with invalid fitness they are computed again
     '''
@@ -154,9 +154,21 @@ def individual_fitness(ind, points, target, toolbox):
 
 
 def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, training_set, test_set, halloffame,
-                     stats=None, verbose=__debug__):
+                     stats=None, verbose=__debug__, epsilon=1e-3):
 
     def _terminate():
+        # check convergence
+        #print(evals)
+        if len(halloffame) > 0:
+            vals = halloffame[0].eval_at_points(training_set)
+            nonlocal evals
+            evals += len(training_set)
+            errors = map(abs, train_set_target - vals)
+            max_error = max(errors)
+            print(max_error)
+            if max_error < epsilon:
+                return True
+        # check given condition
         vars_name_mapping = {'gen' : gen, 'evals' : evals, 'time' : time.time() - start_time, \
             'best_fitness' : halloffame[0].fitness.values if len(halloffame) > 0 else np.inf}
         return end_func(vars_name_mapping[end_cond])
@@ -209,7 +221,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f, **record)
+        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f, predictor=predictor, **record)
 
         if verbose:
             print(logbook.stream)
