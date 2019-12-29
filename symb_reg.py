@@ -274,7 +274,7 @@ def run(end_cond, end_func, fitness_predictor='exact', epsilon=1e-3):
     hof = tools.HallOfFame(1)
 
     predictors = {'exact' : fitness_pred.ExactFitness(len(TRAINING_SET)), \
-                  'SchmidLipson' : fitness_pred.SchmidLipsonFPManager(len(TRAINING_SET), predictors_size=8)}
+                  'SchmidtLipson' : fitness_pred.SchmidtLipsonFPManager(len(TRAINING_SET), predictors_size=8)}
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
                                 predictors[fitness_predictor], TRAINING_SET, TEST_SET, halloffame=hof,
@@ -289,9 +289,9 @@ if __name__ == '__main__':
         try:
             begin = '\n' if i != 1 else ''
             print(f'{begin}run {i}')
-            _, log, hof = run('evals', lambda x: x >= 1e7, 'exact')
-            with open(f'results{i}.p', 'wb') as f:
-                pickle.dump(log, f)
+            _, log, hof = run('evals', lambda x: x >= 1e7, 'SchmidtLipson')
+            #with open(f'results{i}.p', 'wb') as f:
+            #    pickle.dump(log, f)
         except KeyboardInterrupt:
             print()
             break

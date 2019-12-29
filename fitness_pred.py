@@ -61,7 +61,7 @@ class ExactFitness(FitnessPredictorManager):
     def next_generation(self, **kwargs):
         return 0
 
-class SchmidLipsonFPManager(FitnessPredictorManager):
+class SchmidtLipsonFPManager(FitnessPredictorManager):
 
     def __init__(self, training_set_size, predictors_size=8, num_predictors=8,
                  mutpb=0.1, cxpb=0.5, num_trainers=10):
