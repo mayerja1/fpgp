@@ -72,7 +72,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
                  mutpb=0.1, cxpb=0.5, num_trainers=10):
         self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb)
                               for _ in range(num_predictors)]
-        #self.predictors_fitnesses = [0] * num_predictors
+
         self.trainers_pop = [None] * num_trainers
         self.trainers_fitness = deque([0] * num_trainers)
         self.pred_evolution_gen = 0
@@ -119,7 +119,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
             c2.mutate()
             # we define distance as number of different test_cases
             dist = lambda x, y: len(set(x.test_cases) ^ set(y.test_cases))
-            fitnesses = {p: -self.predictor_fitness(p, training_set, target_values, toolbox) for p in (p1, p2, c1, c2)}
+            fitnesses = {p: self.predictor_fitness(p, training_set, target_values, toolbox) for p in (p1, p2, c1, c2)}
             nevals += 4 * len(self.trainers_pop) * len(self.predictor_pop[0].test_cases)
             tournament = []
             if dist(p1, c1) + dist(p2, c2) <= dist(p1, c2) + dist(p2, c1):
