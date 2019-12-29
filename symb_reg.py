@@ -160,12 +160,12 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         # check convergence
         #print(evals)
         if len(halloffame) > 0:
-            vals = halloffame[0].eval_at_points(training_set)
-            nonlocal evals
-            evals += len(training_set)
-            errors = map(abs, train_set_target - vals)
+            nonlocal evals, best_sol_vals
+            errors = map(abs, train_set_target - best_sol_vals)
             max_error = max(errors)
-            print(max_error)
+
+            #print(gen, max_error, end='\r')
+
             if max_error < epsilon:
                 return True
         # check given condition
@@ -191,6 +191,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     # Begin the generational process
     while not _terminate():
+        print('{:.2e}'.format(evals), end='\r')
         gen += 1
         # get points to use
         nevals = fp.next_generation(gen=gen, pop=population, training_set=training_set, \
@@ -211,8 +212,10 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         #print(pred_evals / (evals))
         population[:] = offspring
 
-        # Update the hall of fame with the generated individuals
+        # Update the hall of fame with the generated individuals and gen values of the best individual
         halloffame.update(population)
+        best_sol_vals = halloffame[0].eval_at_points(training_set)
+        evals += len(training_set)
 
         # get test_set fitness
         best_ind = halloffame[0]
@@ -221,7 +224,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f, predictor=predictor, **record)
+        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f, predictor=predictor, best_sol_vals=best_sol_vals, **record)
 
         if verbose:
             print(logbook.stream)
@@ -236,19 +239,21 @@ _a = np.min(TRAINING_SET)
 _b = np.max(TRAINING_SET)
 TEST_SET = np.append(TRAINING_SET, np.random.uniform(_a, _b, 200))
 
-
+_toolbox_registered = False
 def symb_reg_initialize():
     # initialization
-
-    creator.create("Individual", SymbRegTree, fitness=creator.FitnessMin)
-    toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("compile", gp.compile, pset=pset)
-    toolbox.register("evaluate", symbreg_fitness)
-    toolbox.register("individual_fitness", individual_fitness)
-    toolbox.register("target_func", target_func)
-    toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
-    #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
+    global _toolbox_registered
+    if not _toolbox_registered:
+        creator.create("Individual", SymbRegTree, fitness=creator.FitnessMin)
+        toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+        toolbox.register("compile", gp.compile, pset=pset)
+        toolbox.register("evaluate", symbreg_fitness)
+        toolbox.register("individual_fitness", individual_fitness)
+        toolbox.register("target_func", target_func)
+        toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
+        #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
+        _toolbox_registered = True
 
 
     # stats we want to keep track of
@@ -263,20 +268,30 @@ def symb_reg_initialize():
 
     return mstats
 
-def run(end_cond, end_func, fitness_predictor='exact'):
+def run(end_cond, end_func, fitness_predictor='exact', epsilon=1e-3):
     stats = symb_reg_initialize()
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
     predictors = {'exact' : fitness_pred.ExactFitness(len(TRAINING_SET)), \
-                  'SchmidLipson' : fitness_pred.SchmidLipsonFPManager(len(TRAINING_SET))}
+                  'SchmidLipson' : fitness_pred.SchmidLipsonFPManager(len(TRAINING_SET), predictors_size=8)}
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
                                 predictors[fitness_predictor], TRAINING_SET, TEST_SET, halloffame=hof,
-                                stats=stats, verbose=False)
+                                stats=stats, verbose=False, epsilon=epsilon)
 
     return pop, log, hof
 
 if __name__ == '__main__':
-    _, log, hof = run('gen', lambda x: x >= 200, fitness_predictor='SchmidLipson')
-    print(log[-1])
+    import pickle
+    runs = 10
+    for i in range(1, runs + 1):
+        try:
+            begin = '\n' if i != 1 else ''
+            print(f'{begin}run {i}')
+            _, log, hof = run('evals', lambda x: x >= 1e7, 'exact')
+            with open(f'results{i}.p', 'wb') as f:
+                pickle.dump(log, f)
+        except KeyboardInterrupt:
+            print()
+            break
