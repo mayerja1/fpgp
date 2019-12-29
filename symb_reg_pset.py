@@ -17,6 +17,6 @@ pset.addPrimitive(math.sin, 1)
 pset.addPrimitive(sf.safe_exp, 1)
 pset.addPrimitive(sf.safe_log, 1)
 
-pset.addEphemeralConstant("rand101", lambda: random.randint(-1,1))
+pset.addEphemeralConstant("rand101", lambda: random.randint(-1, 1))
 pset.addTerminal("pi", math.pi)
 pset.renameArguments(ARG0='x')

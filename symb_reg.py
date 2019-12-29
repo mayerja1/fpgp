@@ -63,6 +63,7 @@ class SymbRegTree(gp.PrimitiveTree):
         assert(self.func is not None)
         return [self.func(p) for p in points]
 
+
 def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
     assert(len(population) % 2 == 0)
     parents = [toolbox.clone(ind) for ind in population]
@@ -94,7 +95,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
             c2.make_invalid()
         family = (p1, p2, c1, c2)
         invalid_ind = (ind for ind in family if not ind.fitness.valid)
-        family_idx = {'p1' : 0, 'p2' : 1, 'c1' : 2, 'c2' : 3}
+        family_idx = {'p1': 0, 'p2': 1, 'c1': 2, 'c2': 3}
         # selection
         # evaluate, get errors and fitnesses
         target_values = np.array([toolbox.target_func(x) for x in points])
@@ -105,8 +106,8 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
             ind.fitness.values = toolbox.evaluate(ind.error_vec)
         # select new individuals according to rules from 'the paper'
         # phenotypic distance
-        dist = lambda ind1, ind2: np.linalg.norm(family[family_idx[ind1]].error_vec \
-                                               - family[family_idx[ind2]].error_vec)
+        dist = lambda ind1, ind2: np.linalg.norm(family[family_idx[ind1]].error_vec
+                                                 - family[family_idx[ind2]].error_vec)
         tournament = []
         if dist('p1', 'c1') + dist('p2', 'c2') <= dist('p1', 'c2') + dist('p2', 'c1'):
             tournament.append((c1, p1))
@@ -124,6 +125,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
     # new generation
     return offspring, nevals
 
+
 def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_size, parsimony_size):
     offspring = algorithms.varAnd(population, toolbox, cxpb, mutpb)
     # evaluate
@@ -138,11 +140,15 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
         ind.fitness.values = toolbox.evaluate(ind.error_vec)
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False), nevals
 
+
 def target_func(x):
-    return math.exp(abs(x))*math.sin(2 * math.pi * x)
+    return 1.5 * (x**2) - (x**3)
+    # return math.exp(abs(x))*math.sin(2 * math.pi * x)
+
 
 def symbreg_fitness(errors):
     return math.fsum(map(abs, errors)) / len(errors),
+
 
 def individual_fitness(ind, points, target, toolbox):
     '''
@@ -169,8 +175,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
             if max_error < epsilon:
                 return True
         # check given condition
-        vars_name_mapping = {'gen' : gen, 'evals' : evals, 'time' : time.time() - start_time, \
-            'best_fitness' : halloffame[0].fitness.values if len(halloffame) > 0 else np.inf}
+        vars_name_mapping = {'gen': gen, 'evals': evals, 'time': time.time() - start_time,
+                             'best_fitness': halloffame[0].fitness.values if len(halloffame) > 0 else np.inf}
         return end_func(vars_name_mapping[end_cond])
 
     logbook = tools.Logbook()
@@ -194,8 +200,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         print('{:.2e}'.format(evals), end='\r')
         gen += 1
         # get points to use
-        nevals = fp.next_generation(gen=gen, pop=population, training_set=training_set, \
-                                    target_values=train_set_target, toolbox=toolbox, \
+        nevals = fp.next_generation(gen=gen, pop=population, training_set=training_set,
+                                    target_values=train_set_target, toolbox=toolbox,
                                     effort=pred_evals / evals if evals != 0 else 0)
 
         predictor = fp.get_best_predictor()
@@ -231,6 +237,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     return population, logbook
 
+
 CXPB = 0.5
 MUTPB = 0.1
 POP_SIZE = 128
@@ -240,6 +247,8 @@ _b = np.max(TRAINING_SET)
 TEST_SET = np.append(TRAINING_SET, np.random.uniform(_a, _b, 200))
 
 _toolbox_registered = False
+
+
 def symb_reg_initialize():
     # initialization
     global _toolbox_registered
@@ -255,7 +264,6 @@ def symb_reg_initialize():
         #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
         _toolbox_registered = True
 
-
     # stats we want to keep track of
     stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
     stats_size = tools.Statistics(len)
@@ -268,19 +276,21 @@ def symb_reg_initialize():
 
     return mstats
 
+
 def run(end_cond, end_func, fitness_predictor='exact', epsilon=1e-3):
     stats = symb_reg_initialize()
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
-    predictors = {'exact' : fitness_pred.ExactFitness(len(TRAINING_SET)), \
-                  'SchmidtLipson' : fitness_pred.SchmidtLipsonFPManager(len(TRAINING_SET), predictors_size=8)}
+    predictors = {'exact': fitness_pred.ExactFitness(len(TRAINING_SET)),
+                  'SchmidtLipson': fitness_pred.SchmidtLipsonFPManager(len(TRAINING_SET), predictors_size=8)}
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
                                 predictors[fitness_predictor], TRAINING_SET, TEST_SET, halloffame=hof,
                                 stats=stats, verbose=False, epsilon=epsilon)
 
     return pop, log, hof
+
 
 if __name__ == '__main__':
     import pickle
@@ -290,8 +300,8 @@ if __name__ == '__main__':
             begin = '\n' if i != 1 else ''
             print(f'{begin}run {i}')
             _, log, hof = run('evals', lambda x: x >= 1e7, 'SchmidtLipson')
-            #with open(f'results{i}.p', 'wb') as f:
-            #    pickle.dump(log, f)
+            with open(f'results{i}.p', 'wb') as f:
+                pickle.dump(log, f)
         except KeyboardInterrupt:
             print()
             break

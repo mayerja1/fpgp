@@ -4,6 +4,7 @@ import numpy as np
 import copy
 from collections import deque
 
+
 class FitnessPredictor():
 
     def __init__(self, training_set_size, size, test_cases=None):
@@ -18,6 +19,7 @@ class FitnessPredictor():
 
     def __str__(self):
         return str(self.test_cases)
+
 
 class EvolvingFitnessPredictor(FitnessPredictor):
 
@@ -38,6 +40,7 @@ class EvolvingFitnessPredictor(FitnessPredictor):
             xo_point = random.randint(0, self.size - 1)
             self.test_cases[:xo_point] = other.test_cases[:xo_point]
 
+
 class FitnessPredictorManager():
 
     def __init__(self, training_set_size):
@@ -48,6 +51,7 @@ class FitnessPredictorManager():
 
     def next_generation(self, **kwargs):
         raise NotImplementedError()
+
 
 class ExactFitness(FitnessPredictorManager):
 
@@ -61,11 +65,12 @@ class ExactFitness(FitnessPredictorManager):
     def next_generation(self, **kwargs):
         return 0
 
+
 class SchmidtLipsonFPManager(FitnessPredictorManager):
 
     def __init__(self, training_set_size, predictors_size=8, num_predictors=8,
                  mutpb=0.1, cxpb=0.5, num_trainers=10):
-        self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb) \
+        self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb)
                               for _ in range(num_predictors)]
         #self.predictors_fitnesses = [0] * num_predictors
         self.trainers_pop = [None] * num_trainers
@@ -85,8 +90,10 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
             self.trainers_pop = deque([copy.deepcopy(random.choice(kwargs['pop'])) for _ in range(len(self.trainers_pop))])
             # get exact fitness
             for i, t in enumerate(self.trainers_pop):
-                self.trainers_fitness[i] = kwargs['toolbox'].individual_fitness(t, kwargs['training_set'], \
-                                                     kwargs['target_values'], kwargs['toolbox'])[0]
+                self.trainers_fitness[i] = \
+                    kwargs['toolbox'].individual_fitness(t, kwargs['training_set'],
+                                                         kwargs['target_values'],
+                                                         kwargs['toolbox'])[0]
                 nevals += len(kwargs['training_set'])
         if kwargs['effort'] <= 0.05:
             self.pred_evolution_gen += 1
@@ -96,7 +103,6 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
                 nevals += self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
 
         return nevals
-
 
     def deterministic_crowding(self, training_set, target_values, toolbox):
         assert(len(self.predictor_pop) % 2 == 0)
@@ -113,7 +119,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
             c2.mutate()
             # we define distance as number of different test_cases
             dist = lambda x, y: len(set(x.test_cases) ^ set(y.test_cases))
-            fitnesses = {p : -self.predictor_fitness(p, training_set, target_values, toolbox) for p in (p1, p2, c1, c2)}
+            fitnesses = {p: -self.predictor_fitness(p, training_set, target_values, toolbox) for p in (p1, p2, c1, c2)}
             nevals += 4 * len(self.trainers_pop) * len(self.predictor_pop[0].test_cases)
             tournament = []
             if dist(p1, c1) + dist(p2, c2) <= dist(p1, c2) + dist(p2, c1):
@@ -137,7 +143,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         return nevals
 
     def predictor_fitness(self, p, training_set, target_values, toolbox):
-        predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
+        predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0]
                                for t in self.trainers_pop]
         # negative so that we want to find maximal fitness
         return -math.fsum(map(lambda x: abs(x[0] - x[1]), zip(predicted_fitnesses, self.trainers_fitness))) / len(self.trainers_pop)
@@ -146,7 +152,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         nevals = 0
         solutions_variances = np.zeros(len(pop))
         for i, s in enumerate(pop):
-            predicted_fitnesses = [toolbox.individual_fitness(s, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0] \
+            predicted_fitnesses = [toolbox.individual_fitness(s, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0]
                                    for p in self.predictor_pop]
             nevals += len(self.predictor_pop) * len(self.predictor_pop[0].test_cases)
             solutions_variances[i] = np.var(predicted_fitnesses)

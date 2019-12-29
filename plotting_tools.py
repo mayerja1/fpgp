@@ -4,6 +4,7 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import animation
 
+
 def visualize_run(training_set, target_func, log, step=1, freq=100):
     fig, ax = plt.subplots()
 
@@ -19,7 +20,6 @@ def visualize_run(training_set, target_func, log, step=1, freq=100):
     pred_plot, = plt.plot([], [], ls=' ', marker='o', label='used predictor')
     target_plot, = plt.plot([], [], color='blue', alpha=0.5, label='target function')
     sol_plot, = plt.plot([], [], color='red', label='best solution')
-
 
     def init():
         ax.set_xlim(min(training_set), max(training_set))
@@ -39,6 +39,7 @@ def visualize_run(training_set, target_func, log, step=1, freq=100):
                         init_func=init, interval=1/freq * 1000)
     return ani
 
+
 def predictor_histogram(training_set, target_func, log):
     predictors = log.select('predictor')
 
@@ -51,12 +52,12 @@ def predictor_histogram(training_set, target_func, log):
     ax1.set_ylabel('point usage')
     ax1.legend(['usage'], loc=2)
 
-
     ax2 = ax1.twinx()
     ax2.plot(training_set, list(map(target_func, training_set)), linestyle=' ', marker='o', markersize=3,
              color='black', markeredgecolor='white', markeredgewidth=0.1)
 
     ax2.legend(['f(x)'], loc=1)
+
 
 # methods is a list of lists of logbooks
 def compare_performance(methods, x, y, min_x, max_x, num_points=10, method_names=[], ignore_tresh=1e6):
@@ -71,6 +72,7 @@ def compare_performance(methods, x, y, min_x, max_x, num_points=10, method_names
         vals[vals > ignore_tresh] = np.nan
         plt.errorbar(points, np.nanmean(vals, axis=0), yerr=np.nanstd(vals, axis=0), capsize=2, marker='x', ms=5)
     ax.legend(method_names)
+
 
 if __name__ == '__main__':
     import pickle

@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def binary_search(l, v):
 
     def _binary_search(l, v, a, b):
@@ -14,8 +15,10 @@ def binary_search(l, v):
 
     return _binary_search(l, v, 0, len(l) - 1)
 
+
 def linear_interpolation(x1, y1, x2, y2, x):
     return y1 + (x - x1) / (x2 - x1) * (y2 - y1)
+
 
 def val_at_point(xs, ys, x):
     a, b = binary_search(xs, x)
@@ -31,12 +34,14 @@ def val_at_point(xs, ys, x):
     # the value is after last x
     return ys[-1]
 
+
 def vals_at_points(xss, yss, points):
     vals = np.zeros((len(xss), len(points)))
     for i, p in enumerate(points):
         for j, (xs, ys) in enumerate(zip(xss, yss)):
             vals[j, i] = val_at_point(xs, ys, p)
     return vals
+
 
 def get_xss_yss_from_logbooks(logbooks, x, y):
     xss, yss = [], []
