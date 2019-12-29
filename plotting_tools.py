@@ -1,3 +1,4 @@
+import utils
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
@@ -57,6 +58,19 @@ def predictor_histogram(training_set, target_func, log):
 
     ax2.legend(['f(x)'], loc=1)
 
+# methods is a list of lists of logbooks
+def compare_performance(methods, x, y, min_x, max_x, num_points=10, method_names=[], ignore_tresh=1e6):
+    fig, ax = plt.subplots()
+    points = np.linspace(min_x, max_x, num_points)
+    ax.set_ylabel(y)
+    ax.set_xlabel(x)
+    for i, method in enumerate(methods):
+        xss, yss = utils.get_xss_yss_from_logbooks(method, x, y)
+        vals = utils.vals_at_points(xss, yss, points)
+        print(vals[vals > ignore_tresh].size)
+        vals[vals > ignore_tresh] = np.nan
+        plt.errorbar(points, np.nanmean(vals, axis=0), yerr=np.nanstd(vals, axis=0), capsize=2, marker='x', ms=5)
+    ax.legend(method_names)
 
 if __name__ == '__main__':
     import pickle
