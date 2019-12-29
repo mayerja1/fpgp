@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import animation
 
-def visualize_run(training_set, target_func, log, freq=100):
+def visualize_run(training_set, target_func, log, step=1, freq=100):
     fig, ax = plt.subplots()
 
     ngens = len(log)
@@ -34,7 +34,7 @@ def visualize_run(training_set, target_func, log, freq=100):
         ax.legend()
         return pred_plot, target_plot, sol_plot
 
-    ani = FuncAnimation(fig, update, frames=(i for i in range(ngens)),
+    ani = FuncAnimation(fig, update, frames=(i for i in range(0, ngens, step)),
                         init_func=init, interval=1/freq * 1000)
     return ani
 
