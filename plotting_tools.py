@@ -13,6 +13,7 @@ def visualize_run(training_set, target_func, log, freq=100):
     solutions_vals = log.select('best_sol_vals')
     predictors = log.select('predictor')
     test_set_f = log.select('test_set_f')
+    evals = log.select('evals')
 
     pred_plot, = plt.plot([], [], ls=' ', marker='o')
     target_plot, = plt.plot([], [], color='blue', alpha=0.5)
@@ -26,18 +27,20 @@ def visualize_run(training_set, target_func, log, freq=100):
         return pred_plot, target_plot, sol_plot
 
     def update(i):
-        ax.set_title(f'generation: {i}\ntest set fitness: {test_set_f[i]}')
-        pred_plot.set_data(training_set[predictors[i]], target_func(training_set[predictors[i]]))
+        s = '{:.2e}'.format(evals[i])
+        ax.set_title(f'generation: {i + 1}, evals: {s}\ntest set fitness: {test_set_f[i]}')
+        pred_plot.set_data(training_set[predictors[i]], list(map(target_func, training_set[predictors[i]])))
         sol_plot.set_data(training_set, solutions_vals[i])
         return pred_plot, target_plot, sol_plot
 
-    ani = FuncAnimation(fig, update, frames=range(1, ngens),
+    ani = FuncAnimation(fig, update, frames=(i for i in range(ngens)),
                         init_func=init, interval=1/freq * 1000)
-    plt.show()
+    return ani
+    #plt.show()
 
 
 if __name__ == '__main__':
     import pickle
-    with open('results3.p', 'rb') as f:
+    with open('results10.p', 'rb') as f:
         log = pickle.load(f)
         visualize_run(np.linspace(-3, 3, 200), lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), log)
