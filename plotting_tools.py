@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import animation
+import warnings
 
 
 def visualize_run(training_set, target_func, log, step=1, freq=100):
@@ -68,7 +69,8 @@ def compare_performance(methods, x, y, min_x, max_x, num_points=10, method_names
     for i, method in enumerate(methods):
         xss, yss = utils.get_xss_yss_from_logbooks(method, x, y)
         vals = utils.vals_at_points(xss, yss, points)
-        print(vals[vals > ignore_tresh].size)
+        if vals[vals > ignore_tresh].size > 0:
+            warnings.warn(f'{vals[vals > ignore_tresh].size} values were ignored for being too high')
         vals[vals > ignore_tresh] = np.nan
         plt.errorbar(points, np.nanmean(vals, axis=0), yerr=np.nanstd(vals, axis=0), capsize=2, marker='x', ms=5)
     ax.legend(method_names)
