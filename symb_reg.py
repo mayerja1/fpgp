@@ -83,8 +83,10 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
         p1, p2 = parents[i - 1], parents[i]
 
         # if we weren't supposed to crossover, use the original parent
-        if random.random() > cxpb: c1 = toolbox.clone(p1)
-        if random.random() > cxpb: c2 = toolbox.clone(p2)
+        if random.random() > cxpb:
+            c1 = toolbox.clone(p1)
+        if random.random() > cxpb:
+            c2 = toolbox.clone(p2)
 
         # mutate
         if random.random() < mutpb:
@@ -193,7 +195,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
     train_set_target = np.array([toolbox.target_func(p) for p in training_set])
 
     # set functions of first generation, needed for predictor initialization
-    for ind in population: ind.set_func(toolbox.compile)
+    for ind in population:
+        ind.set_func(toolbox.compile)
 
     # Begin the generational process
     while not _terminate():
