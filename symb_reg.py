@@ -246,7 +246,9 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f, predictor=predictor, best_sol_vals=best_sol_vals, **record)
+        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f,
+                       predictor=predictor, best_sol_vals=best_sol_vals,
+                       time=time.time() - start_time, **record)
 
         if verbose:
             print(logbook.stream)
