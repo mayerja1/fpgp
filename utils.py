@@ -57,6 +57,8 @@ def get_logs_from_folder(path):
     logs = []
     for l in os.listdir(path):
         try:
+            if l.split('.')[-1] != 'p':
+                continue
             with open(os.path.join(path, l), 'rb') as fp:
                 logs.append(pickle.load(fp))
         except IsADirectoryError:
