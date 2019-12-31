@@ -323,11 +323,11 @@ def run_config(fname):
         except FileExistsError:
             print('the experiment folder already exists...')
         # copy dataset, so that we know which dataset was used
-        np.savez(f'{path}/dataset.npz', trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
+        np.savez(os.path.join(path, 'dataset.npz'), trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
         for i in range(experiment['runs']):
             print(f'starting run {i}')
             _, log, _ = run(**experiment['run_args'])
-            with open(path + f'{uuid.uuid4()}.p', 'wb') as fp:
+            with open(os.path.join(path, f'{uuid.uuid4()}.p'), 'wb') as fp:
                 pickle.dump(log, fp)
 
 
