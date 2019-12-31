@@ -10,6 +10,7 @@ import copy
 import json
 import os
 import pickle
+import functools
 
 from symb_reg_pset import pset
 from symb_reg_toolbox import toolbox
@@ -153,7 +154,7 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
         ind.fitness.values = toolbox.evaluate(ind.error_vec)
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False), nevals
 
-
+@functools.lru_cache(maxsize=400)
 def target_func(x):
     # simpy return y-values from training/testing data
     output_vals = np.concatenate([trn_y[trn_x == x], tst_y[tst_x == x]])
@@ -320,4 +321,6 @@ def run_config(fname):
 
 
 if __name__ == '__main__':
-    run_config('experiments/f2_1e7_evals.json')
+    #run_config('experiments/f2_1e7_evals.json')
+    load_dataset('datasets/f2.npz')
+    run(end_func=lambda x: x >= 200)
