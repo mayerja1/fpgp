@@ -29,7 +29,7 @@ def visualize_run(training_set, train_vals, log, step=1, freq=100):
     def update(i):
         s = '{:.2e}'.format(evals[i])
         ax.set_title(f'generation: {i + 1}, evals: {s}\ntest set fitness: {test_set_f[i]}')
-        pred_plot.set_data(training_set[predictors[i]], list(map(target_func, training_set[predictors[i]])))
+        pred_plot.set_data(training_set[predictors[i]], train_vals[predictors[i]])
         sol_plot.set_data(training_set, solutions_vals[i])
         ax.legend()
         return pred_plot, target_plot, sol_plot
