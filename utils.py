@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import pickle
 
 
 def binary_search(l, v):
@@ -49,3 +51,14 @@ def get_xss_yss_from_logbooks(logbooks, x, y):
         xss.append(log.select(x))
         yss.append(log.select(y))
     return xss, yss
+
+
+def get_logs_from_folder(path):
+    logs = []
+    for l in os.listdir(path):
+        try:
+            with open(os.path.join(path, l), 'rb') as fp:
+                logs.append(pickle.load(fp))
+        except IsADirectoryError:
+            print('there are more folders in path, are you sure this is the right path?')
+    return logs
