@@ -285,13 +285,15 @@ def symb_reg_initialize():
     return mstats
 
 
-def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', epsilon=1e-3):
+def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', predictor_kw={}, epsilon=1e-3):
     stats = symb_reg_initialize()
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
     predictors = {'exact': fitness_pred.ExactFitness(len(trn_x)),
-                  'SchmidtLipson': fitness_pred.SchmidtLipsonFPManager(len(trn_x), predictors_size=8)}
+                  'SchmidtLipson': fitness_pred.SchmidtLipsonFPManager(len(trn_x)),
+                  'coev_modified': fitness_pred.SchmidtLipsonFPManager(len(trn_x), **predictor_kw)
+                  }
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
                                 predictors[fitness_predictor], trn_x, tst_x, halloffame=hof,
@@ -316,12 +318,12 @@ def run_config(fname):
         # make end func callable
         experiment['run_args']['end_func'] = eval(experiment['run_args']['end_func'])
         path = f'data/{experiment["name"]}'
-        # copy dataset, so that we know which dataset was used
-        np.savez(f'{path}/dataset.npz', trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
         try:
             os.makedirs(path)
         except FileExistsError:
             print('the experiment folder already exists...')
+        # copy dataset, so that we know which dataset was used
+        np.savez(f'{path}/dataset.npz', trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
         for i in range(experiment['runs']):
             print(f'starting run {i}')
             _, log, _ = run(**experiment['run_args'])
