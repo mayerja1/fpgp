@@ -7,6 +7,9 @@ import random
 import operator
 import traceback
 import copy
+import json
+import os
+import pickle
 
 from symb_reg_pset import pset
 from symb_reg_toolbox import toolbox
@@ -17,6 +20,14 @@ from deap import algorithms
 from deap import tools
 from deap import algorithms
 from deap import creator
+
+# constants used by gp
+CXPB = 0.5
+MUTPB = 0.1
+POP_SIZE = 128
+
+# used dataset, trn = train, tst = test, x = input, y = output
+trn_x = trn_y = tst_x = tst_y = None
 
 
 class SymbRegTree(gp.PrimitiveTree):
@@ -144,8 +155,10 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
 
 
 def target_func(x):
-    return 1.5 * (x**2) - (x**3)
-    # return math.exp(abs(x))*math.sin(2 * math.pi * x)
+    # simpy return y-values from training/testing data
+    output_vals = np.concatenate([trn_y[trn_x == x], tst_y[tst_x == x]])
+    assert(len(output_vals) > 0)
+    return output_vals[0]
 
 
 def symbreg_fitness(errors):
@@ -166,13 +179,10 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     def _terminate():
         # check convergence
-        #print(evals)
         if len(halloffame) > 0:
             nonlocal evals, best_sol_vals
             errors = map(abs, train_set_target - best_sol_vals)
             max_error = max(errors)
-
-            #print(gen, max_error, end='\r')
 
             if max_error < epsilon:
                 return True
@@ -218,7 +228,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         # crossover, mutation and selection
         offspring, nevals = toolbox.new_gen(population=population, points=training_set[predictor])
         evals += nevals
-        #print(pred_evals / (evals))
+
         population[:] = offspring
 
         # Update the hall of fame with the generated individuals and gen values of the best individual
@@ -240,14 +250,6 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     return population, logbook
 
-
-CXPB = 0.5
-MUTPB = 0.1
-POP_SIZE = 128
-TRAINING_SET = np.linspace(-3, 3, 200)
-_a = np.min(TRAINING_SET)
-_b = np.max(TRAINING_SET)
-TEST_SET = np.append(TRAINING_SET, np.random.uniform(_a, _b, 200))
 
 _toolbox_registered = False
 
@@ -280,31 +282,42 @@ def symb_reg_initialize():
     return mstats
 
 
-def run(end_cond, end_func, fitness_predictor='exact', epsilon=1e-3):
+def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', epsilon=1e-3):
     stats = symb_reg_initialize()
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
-    predictors = {'exact': fitness_pred.ExactFitness(len(TRAINING_SET)),
-                  'SchmidtLipson': fitness_pred.SchmidtLipsonFPManager(len(TRAINING_SET), predictors_size=8)}
+    predictors = {'exact': fitness_pred.ExactFitness(len(trn_x)),
+                  'SchmidtLipson': fitness_pred.SchmidtLipsonFPManager(len(trn_x), predictors_size=8)}
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
-                                predictors[fitness_predictor], TRAINING_SET, TEST_SET, halloffame=hof,
+                                predictors[fitness_predictor], trn_x, tst_x, halloffame=hof,
                                 stats=stats, verbose=False, epsilon=epsilon)
 
     return pop, log, hof
 
 
+def load_dataset(fname):
+    x = np.load(fname)
+    global trn_x, trn_y, tst_x, tst_y
+    trn_x, trn_y = x['trn_x'], x['trn_y']
+    tst_x, tst_y = x['tst_x'], x['tst_y']
+
+
+def run_config(fname):
+    with open(fname, 'r') as fp:
+        cfg = json.load(fp)
+    for experiment in cfg:
+        load_dataset(experiment['dataset'])
+        # make end func callable
+        experiment['run_args']['end_func'] = eval(experiment['run_args']['end_func'])
+        path = f'data/{experiment["name"]}/'
+        os.makedirs(path)
+        for i in range(experiment['runs']):
+            _, log, _ = run(**experiment['run_args'])
+            with open(path + f'log{i}.p', 'wb') as fp:
+                pickle.dump(log, fp)
+
+
 if __name__ == '__main__':
-    import pickle
-    runs = 10
-    for i in range(1, runs + 1):
-        try:
-            begin = '\n' if i != 1 else ''
-            print(f'{begin}run {i}')
-            _, log, hof = run('evals', lambda x: x >= 1e7, 'SchmidtLipson')
-            with open(f'results{i}.p', 'wb') as f:
-                pickle.dump(log, f)
-        except KeyboardInterrupt:
-            print()
-            break
+    run_config('experiments/f2_1e7_evals.json')
