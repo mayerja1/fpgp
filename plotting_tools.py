@@ -6,12 +6,10 @@ from matplotlib import animation
 import warnings
 
 
-def visualize_run(training_set, target_func, log, step=1, freq=100):
+def visualize_run(training_set, train_vals, log, step=1, freq=100):
     fig, ax = plt.subplots()
 
     ngens = len(log)
-
-    train_vals = list(map(target_func, training_set))
 
     solutions_vals = log.select('best_sol_vals')
     predictors = log.select('predictor')
@@ -41,7 +39,7 @@ def visualize_run(training_set, target_func, log, step=1, freq=100):
     return ani
 
 
-def predictor_histogram(training_set, target_func, log):
+def predictor_histogram(training_set, training_vals, log):
     predictors = log.select('predictor')
 
     used_tests_idxs = np.concatenate(predictors)
@@ -54,7 +52,7 @@ def predictor_histogram(training_set, target_func, log):
     ax1.legend(['usage'], loc=2)
 
     ax2 = ax1.twinx()
-    ax2.plot(training_set, list(map(target_func, training_set)), linestyle=' ', marker='o', markersize=3,
+    ax2.plot(training_set, training_vals, linestyle=' ', marker='o', markersize=3,
              color='black', markeredgecolor='white', markeredgewidth=0.1)
 
     ax2.legend(['f(x)'], loc=1)
