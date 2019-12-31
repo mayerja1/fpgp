@@ -74,6 +74,10 @@ def compare_performance(methods, x, y, min_x, max_x, num_points=10, method_names
     ax.legend(method_names)
 
 
+def show_performance(log, x, y):
+    compare_performance([[log]], x, y, min_x=min(log.select(x)), max_x=max(log.select(x)), ignore_tresh=np.inf)
+
+
 if __name__ == '__main__':
     import pickle
     with open('results10.p', 'rb') as f:
