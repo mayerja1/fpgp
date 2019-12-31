@@ -11,6 +11,7 @@ import json
 import os
 import pickle
 import functools
+import uuid
 
 from symb_reg_pset import pset
 from symb_reg_toolbox import toolbox
@@ -153,6 +154,7 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
         ind.set_error_vec(target_values)
         ind.fitness.values = toolbox.evaluate(ind.error_vec)
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False), nevals
+
 
 @functools.lru_cache(maxsize=400)
 def target_func(x):
@@ -309,18 +311,25 @@ def run_config(fname):
     with open(fname, 'r') as fp:
         cfg = json.load(fp)
     for experiment in cfg:
+        print(f'starting experiment: {experiment["name"]}')
         load_dataset(experiment['dataset'])
         # make end func callable
         experiment['run_args']['end_func'] = eval(experiment['run_args']['end_func'])
-        path = f'data/{experiment["name"]}/'
-        os.makedirs(path)
+        path = f'data/{experiment["name"]}'
+        # copy dataset, so that we know which dataset was used
+        np.savez(f'{path}/dataset.npz', trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
+        try:
+            os.makedirs(path)
+        except FileExistsError:
+            print('the experiment folder already exists...')
         for i in range(experiment['runs']):
+            print(f'starting run {i}')
             _, log, _ = run(**experiment['run_args'])
-            with open(path + f'log{i}.p', 'wb') as fp:
+            with open(path + f'{uuid.uuid4()}.p', 'wb') as fp:
                 pickle.dump(log, fp)
 
 
 if __name__ == '__main__':
-    #run_config('experiments/f2_1e7_evals.json')
-    load_dataset('datasets/f2.npz')
-    run(end_func=lambda x: x >= 200)
+    run_config('experiments/f2_1e7_evals.json')
+    #load_dataset('datasets/f1.npz')
+    #run(fitness_predictor='SchmidtLipson')
