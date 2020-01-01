@@ -54,7 +54,6 @@ def get_xss_yss_from_logbooks(logbooks, x, y):
 
 
 def get_logs_from_folder(path):
-    logs = []
     for l in os.listdir(path):
         if l.split('.')[-1] != 'p':
             continue
@@ -64,4 +63,3 @@ def get_logs_from_folder(path):
             yield log
         except IsADirectoryError:
             print('there are more folders in path, are you sure this is the right path?')
-    # return logs
