@@ -56,11 +56,12 @@ def get_xss_yss_from_logbooks(logbooks, x, y):
 def get_logs_from_folder(path):
     logs = []
     for l in os.listdir(path):
+        if l.split('.')[-1] != 'p':
+            continue
         try:
-            if l.split('.')[-1] != 'p':
-                continue
             with open(os.path.join(path, l), 'rb') as fp:
-                logs.append(pickle.load(fp))
+                log = pickle.load(fp)
+            yield log
         except IsADirectoryError:
             print('there are more folders in path, are you sure this is the right path?')
-    return logs
+    # return logs
