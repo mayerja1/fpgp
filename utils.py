@@ -62,6 +62,14 @@ class LoadedLogs:
         for l in self.get_logs_from_folder():
             yield l
 
+    def __len__(self):
+        len_ = 0
+        for name in os.listdir(self.path):
+            if name.split('.')[-1] != 'p':
+                continue
+            len_ += 1
+        return len_
+
     @property
     def path(self):
         return self._path
