@@ -59,7 +59,7 @@ def predictor_histogram(training_set, training_vals, log):
 
 
 # methods is a list of lists of logbooks
-def compare_performance(methods, x, y, min_x=None, max_x=None num_points=10, method_names=[], ignore_tresh=1e6):
+def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10, method_names=[], ignore_tresh=1e6):
     fig, ax = plt.subplots()
     # get range of values
     if min_x is None or max_x is None:
