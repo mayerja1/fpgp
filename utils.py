@@ -53,13 +53,26 @@ def get_xss_yss_from_logbooks(logbooks, x, y):
     return xss, yss
 
 
-def get_logs_from_folder(path):
-    for l in os.listdir(path):
-        if l.split('.')[-1] != 'p':
-            continue
-        try:
-            with open(os.path.join(path, l), 'rb') as fp:
-                log = pickle.load(fp)
-            yield log
-        except IsADirectoryError:
-            print('there are more folders in path, are you sure this is the right path?')
+class LoadedLogs:
+
+    def __init__(self, path):
+        self._path = path
+
+    def __iter__(self):
+        for l in self.get_logs_from_folder():
+            yield l
+
+    @property
+    def path(self):
+        return self._path
+
+    def get_logs_from_folder(self):
+        for l in os.listdir(self.path):
+            if l.split('.')[-1] != 'p':
+                continue
+            try:
+                with open(os.path.join(self.path, l), 'rb') as fp:
+                    log = pickle.load(fp)
+                yield log
+            except IsADirectoryError:
+                print('there are more folders in path, are you sure this is the right path?')
