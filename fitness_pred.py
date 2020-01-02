@@ -69,7 +69,7 @@ class ExactFitness(FitnessPredictorManager):
 class SchmidtLipsonFPManager(FitnessPredictorManager):
 
     def __init__(self, training_set_size, predictors_size=8, num_predictors=8,
-                 mutpb=0.1, cxpb=0.5, num_trainers=10):
+                 mutpb=0.1, cxpb=0.5, num_trainers=10, effort_tresh=0.05, new_trainer_period=100):
         self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb)
                               for _ in range(num_predictors)]
 
@@ -78,6 +78,8 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         self.pred_evolution_gen = 0
         self.best_pred = None
         self.best_pred_f = -np.inf
+        self.effort_tresh = effort_tresh
+        self.new_trainer_period = int(new_trainer_period)
 
     def get_best_predictor(self):
         return self.best_pred.test_cases
@@ -95,11 +97,11 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
                                                          kwargs['target_values'],
                                                          kwargs['toolbox'])[0]
                 nevals += len(kwargs['training_set'])
-        if kwargs['effort'] <= 0.05:
+        if kwargs['effort'] <= self.effort_tresh:
             self.pred_evolution_gen += 1
             nevals += self.deterministic_crowding(kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
             # add  new trainer every 100 predictor generations
-            if self.pred_evolution_gen % 100 == 0:
+            if self.pred_evolution_gen % self.new_trainer_period == 0:
                 nevals += self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
 
         return nevals
