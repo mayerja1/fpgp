@@ -69,7 +69,7 @@ class ExactFitness(FitnessPredictorManager):
 class SchmidtLipsonFPManager(FitnessPredictorManager):
 
     def __init__(self, training_set_size, predictors_size=8, num_predictors=8,
-                 mutpb=0.1, cxpb=0.5, num_trainers=10, effort_tresh=0.05, new_trainer_period=100):
+                 mutpb=0.1, cxpb=0.5, num_trainers=10, effort_tresh=0.05, new_trainer_period=100, **kwargs):
         self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb)
                               for _ in range(num_predictors)]
 
@@ -98,10 +98,12 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
                                                          kwargs['toolbox'])[0]
                 nevals += len(kwargs['training_set'])
         if kwargs['effort'] <= self.effort_tresh:
+            #print(kwargs['gen'], self.pred_evolution_gen)
             self.pred_evolution_gen += 1
             nevals += self.deterministic_crowding(kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
             # add  new trainer every 100 predictor generations
             if self.pred_evolution_gen % self.new_trainer_period == 0:
+                #print('new_trainer')
                 nevals += self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
 
         return nevals
@@ -167,3 +169,30 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         self.trainers_fitness.appendleft(toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0])
         nevals += len(training_set)
         return nevals
+
+
+class StaticRandom(FitnessPredictorManager):
+
+    def __init__(self, training_set_size, size=8, **kwargs):
+        self.points = np.random.randint(training_set_size, size=size)
+
+    def get_best_predictor(self):
+        return self.points
+
+    def next_generation(self, **kwargs):
+        return 0
+
+
+class DynamicRandom(FitnessPredictorManager):
+
+    def __init__(self, training_set_size, size=8, **kwargs):
+        self.points = np.random.randint(training_set_size, size=size)
+        self.training_set_size = training_set_size
+        self.size = size
+
+    def get_best_predictor(self):
+        return self.points
+
+    def next_generation(self, **kwargs):
+        self.points = np.random.randint(self.training_set_size, size=self.size)
+        return 0

@@ -213,7 +213,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     # Begin the generational process
     while not _terminate():
-        print('{:.2e}'.format(evals), end='\r')
+        # print('{:.2e}'.format(evals), end='\r')
         gen += 1
         # get points to use
         nevals = fp.next_generation(gen=gen, pop=population, training_set=training_set,
@@ -293,8 +293,9 @@ def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact',
     hof = tools.HallOfFame(1)
 
     predictors = {'exact': fitness_pred.ExactFitness(len(trn_x)),
-                  'SchmidtLipson': fitness_pred.SchmidtLipsonFPManager(len(trn_x)),
-                  'coev_modified': fitness_pred.SchmidtLipsonFPManager(len(trn_x), **predictor_kw)
+                  'coev': fitness_pred.SchmidtLipsonFPManager(len(trn_x), **predictor_kw),
+                  'static': fitness_pred.StaticRandom(len(trn_x), **predictor_kw),
+                  'dynamic': fitness_pred.DynamicRandom(len(trn_x), **predictor_kw)
                   }
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
@@ -334,6 +335,8 @@ def run_config(fname):
 
 
 if __name__ == '__main__':
-    run_config('experiments/f2_1e7_evals.json')
-    #load_dataset('datasets/f1.npz')
-    #run(fitness_predictor='SchmidtLipson')
+    import sys
+    if len(sys.argv) < 2:
+        print('enter path to config file')
+    else:
+        run_config(sys.argv[1])
