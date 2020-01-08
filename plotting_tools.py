@@ -71,8 +71,8 @@ def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
     points = np.linspace(min_x, max_x, num_points)
     xlabel = x if xlabel is None else xlabel
     ylabel = y if ylabel is None else ylabel
-    ax.set_ylabel(y)
-    ax.set_xlabel(x)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     for i, method in enumerate(methods):
         xss, yss = utils.get_xss_yss_from_logbooks(method, x, y)
         vals = utils.vals_at_points(xss, yss, points)
