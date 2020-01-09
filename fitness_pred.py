@@ -174,10 +174,10 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
 class StaticRandom(FitnessPredictorManager):
 
     def __init__(self, training_set_size, size=8, **kwargs):
-        self.points = np.random.randint(training_set_size, size=size)
+        self.pred = FitnessPredictor(training_set_size, size)
 
     def get_best_predictor(self):
-        return self.points
+        return self.pred.test_cases
 
     def next_generation(self, **kwargs):
         return 0
@@ -186,13 +186,11 @@ class StaticRandom(FitnessPredictorManager):
 class DynamicRandom(FitnessPredictorManager):
 
     def __init__(self, training_set_size, size=8, **kwargs):
-        self.points = np.random.randint(training_set_size, size=size)
-        self.training_set_size = training_set_size
-        self.size = size
+        self.pred = FitnessPredictor(training_set_size, size)
 
     def get_best_predictor(self):
-        return self.points
+        return self.pred.test_cases
 
     def next_generation(self, **kwargs):
-        self.points = np.random.randint(self.training_set_size, size=self.size)
+        self.pred.random_predictor()
         return 0
