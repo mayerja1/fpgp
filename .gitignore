@@ -1,5 +1,10 @@
 # data of runs
 data/
+plots/
+
+#atom data
+.tags
+.tags_swap
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
