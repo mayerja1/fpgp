@@ -8,14 +8,26 @@ from collections import deque
 class FitnessPredictor():
 
     def __init__(self, training_set_size, size, test_cases=None):
-        self.training_set_size = training_set_size
-        self.test_cases = test_cases
-        self.size = size
+        self._training_set_size = training_set_size
+        self._test_cases = test_cases
+        self._size = size
         if test_cases is None:
             self.random_predictor()
 
+    @property
+    def training_set_size(self):
+        return self._training_set_size
+
+    @property
+    def test_cases(self):
+        return self._test_cases
+
+    @property
+    def size(self):
+        return self._size
+
     def random_predictor(self):
-        self.test_cases = np.random.randint(self.training_set_size, size=self.size)
+        self._test_cases = np.random.randint(self.training_set_size, size=self.size)
 
     def __str__(self):
         return str(self.test_cases)
@@ -39,6 +51,10 @@ class EvolvingFitnessPredictor(FitnessPredictor):
         if random.random() < self.cxpb:
             xo_point = random.randint(0, self.size - 1)
             self.test_cases[:xo_point] = other.test_cases[:xo_point]
+
+
+class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
+    pass
 
 
 class FitnessPredictorManager():
