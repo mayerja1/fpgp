@@ -37,8 +37,16 @@ class EvolvingFitnessPredictor(FitnessPredictor):
 
     def __init__(self, training_set_size, size, mutpb, cxpb, test_cases=None):
         super().__init__(training_set_size, size, test_cases=test_cases)
-        self.cxpb = cxpb
-        self.mutpb = mutpb
+        self._cxpb = cxpb
+        self._mutpb = mutpb
+
+    @property
+    def cxpb(self):
+        return self._cxpb
+
+    @property
+    def mutpb(self):
+        return self._mutpb
 
     def mutate(self):
         for i in range(self.size):
@@ -54,7 +62,23 @@ class EvolvingFitnessPredictor(FitnessPredictor):
 
 
 class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
-    pass
+
+    def __init__(self, training_set_size, size, mutpb, cxpb, init_read_length=8, test_cases=None):
+        super().__init__(training_set_size, size, test_cases=test_cases)
+        self._cxpb = cxpb
+        self._mutpb = mutpb
+        self.read_length = init_read_length
+
+    @property
+    def test_cases(self):
+        return np.array(set(self._test_cases[:self.read_length]))
+
+    def crossover(self, other):
+        if self.size != other.size:
+            raise ValueError('predictors must have same size')
+        if random.random() < self.cxpb:
+            xo_point = random.randint(0, self.read_length - 1)
+            self.test_cases[:xo_point] = other.test_cases[:xo_point]
 
 
 class FitnessPredictorManager():
