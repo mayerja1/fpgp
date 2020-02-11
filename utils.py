@@ -84,3 +84,19 @@ class LoadedLogs:
                 yield log
             except IsADirectoryError:
                 print('there are more folders in path, are you sure this is the right path?')
+
+
+def create_dataset(fname, func):
+    x1 = -3
+    x2 = 3
+    trn_x = np.linspace(x1, x2, 200)
+    trn_y = func(trn_x)
+    tst_x = np.concatenate([trn_x, np.random.random(200) * (x2 - x1) + x1])
+    tst_y = func(tst_x)
+    np.savez(fname, trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
+    import matplotlib.pyplot as plt
+    plt.scatter(tst_x[200:], tst_y[200:])
+    plt.show()
+
+if __name__ == '__main__':
+    create_dataset('datasets/f2_mod', lambda x: np.exp(np.abs(x)) * np.sin(x))
