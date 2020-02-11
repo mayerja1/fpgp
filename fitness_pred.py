@@ -126,7 +126,6 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         return self.best_pred.test_cases
 
     def next_generation(self, **kwargs):
-        nevals = 0
         # first call of the function
         if self.trainers_pop[0] is None:
             # random trainers
@@ -137,22 +136,18 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
                     kwargs['toolbox'].individual_fitness(t, kwargs['training_set'],
                                                          kwargs['target_values'],
                                                          kwargs['toolbox'])[0]
-                nevals += len(kwargs['training_set'])
         if kwargs['effort'] <= self.effort_tresh:
             self.pred_evolution_gen += 1
-            nevals += self.deterministic_crowding(kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
+            self.deterministic_crowding(kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
             # add  new trainer every 100 predictor generations
             if self.pred_evolution_gen % self.new_trainer_period == 0:
-                nevals += self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
-
-        return nevals
+                self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
 
     def deterministic_crowding(self, training_set, target_values, toolbox):
         assert(len(self.predictor_pop) % 2 == 0)
         parents = [copy.deepcopy(p) for p in self.predictor_pop]
         offspring = []
         random.shuffle(parents)
-        nevals = 0
         for i in range(1, len(parents), 2):
             p1, p2 = parents[i - 1], parents[i]
             c1, c2 = map(copy.deepcopy, (p1, p2))
@@ -163,7 +158,6 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
             # we define distance as number of different test_cases
             dist = lambda x, y: len(set(x.test_cases) ^ set(y.test_cases))
             fitnesses = {p: self.predictor_fitness(p, training_set, target_values, toolbox) for p in (p1, p2, c1, c2)}
-            nevals += 4 * len(self.trainers_pop) * len(self.predictor_pop[0].test_cases)
             tournament = []
             if dist(p1, c1) + dist(p2, c2) <= dist(p1, c2) + dist(p2, c1):
                 tournament.append((c1, p1))
@@ -183,8 +177,6 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
 
             self.predictor_pop = offspring
 
-        return nevals
-
     def predictor_fitness(self, p, training_set, target_values, toolbox):
         predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0]
                                for t in self.trainers_pop]
@@ -192,12 +184,10 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         return -math.fsum(map(lambda x: abs(x[0] - x[1]), zip(predicted_fitnesses, self.trainers_fitness))) / len(self.trainers_pop)
 
     def add_fitness_trainer(self, pop, training_set, target_values, toolbox):
-        nevals = 0
         solutions_variances = np.zeros(len(pop))
         for i, s in enumerate(pop):
             predicted_fitnesses = [toolbox.individual_fitness(s, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0]
                                    for p in self.predictor_pop]
-            nevals += len(self.predictor_pop) * len(self.predictor_pop[0].test_cases)
             solutions_variances[i] = np.var(predicted_fitnesses)
 
         # select best one from the population and replace the oldest trainer
@@ -206,8 +196,6 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         new_trainer = copy.deepcopy(pop[np.argmax(solutions_variances)])
         self.trainers_pop.appendleft(new_trainer)
         self.trainers_fitness.appendleft(toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0])
-        nevals += len(training_set)
-        return nevals
 
 
 class DrahosovaSekaninaFPManager(FitnessPredictorManager):
@@ -240,7 +228,7 @@ class StaticRandom(FitnessPredictorManager):
         return self.pred.test_cases
 
     def next_generation(self, **kwargs):
-        return 0
+        pass
 
 
 class DynamicRandom(FitnessPredictorManager):
@@ -253,4 +241,4 @@ class DynamicRandom(FitnessPredictorManager):
 
     def next_generation(self, **kwargs):
         self.pred.random_predictor()
-        return 0
+        pass

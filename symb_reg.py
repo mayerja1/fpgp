@@ -31,6 +31,18 @@ POP_SIZE = 128
 # used dataset, trn = train, tst = test, x = input, y = output
 trn_x = trn_y = tst_x = tst_y = None
 
+# counter of point evaluations
+_POINT_EVALS = 0
+
+
+# function decorator that increases evals counter by one before calling the function
+def increase_evals(func):
+    def decorated(*args, **kwargs):
+        global _POINT_EVALS
+        _POINT_EVALS += 1
+        return func(*args, **kwargs)
+    return decorated
+
 
 class SymbRegTree(gp.PrimitiveTree):
 
@@ -62,7 +74,7 @@ class SymbRegTree(gp.PrimitiveTree):
         self.func = None
 
     def set_func(self, compile_func):
-        self.func = compile_func(self)
+        self.func = increase_evals(compile_func(self))
 
     def set_values(self, points, compile_func):
         self.set_func(compile_func)
@@ -84,7 +96,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
     random.shuffle(parents)
     tree_values = np.zeros((4, len(points)))
     error_vectors = np.zeros_like(tree_values)
-    nevals = 0
+
     for i in range(1, len(parents), 2):
         p1, p2 = toolbox.map(toolbox.clone, (parents[i - 1], parents[i]))
         # crossover
@@ -116,7 +128,6 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
         target_values = np.array([toolbox.target_func(x) for x in points])
         for ind in invalid_ind:
             ind.set_values(points, toolbox.compile)
-            nevals += len(points)
             ind.set_error_vec(target_values)
             ind.fitness.values = toolbox.evaluate(ind.error_vec)
         # select new individuals according to rules from 'the paper'
@@ -138,7 +149,7 @@ def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
 
     assert(len(offspring) == len(population))
     # new generation
-    return offspring, nevals
+    return offspring
 
 
 def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_size, parsimony_size):
@@ -147,13 +158,11 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
     target_values = np.array([toolbox.target_func(x) for x in points])
     ind_values = np.zeros(len(points))
     invalid_ind = (ind for ind in offspring if not ind.fitness.valid)
-    nevals = 0
     for ind in invalid_ind:
-        nevals += len(points)
         ind.set_values(points, toolbox.compile)
         ind.set_error_vec(target_values)
         ind.fitness.values = toolbox.evaluate(ind.error_vec)
-    return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False), nevals
+    return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False)
 
 
 @functools.lru_cache(maxsize=400)
@@ -183,14 +192,14 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
     def _terminate():
         # check convergence
         if len(halloffame) > 0:
-            nonlocal evals, best_sol_vals
+            nonlocal best_sol_vals
             errors = map(abs, train_set_target - best_sol_vals)
             max_error = max(errors)
 
             if max_error < epsilon:
                 return True
         # check given condition
-        vars_name_mapping = {'gen': gen, 'evals': evals, 'time': time.time() - start_time,
+        vars_name_mapping = {'gen': gen, 'evals': _POINT_EVALS, 'time': time.time() - start_time,
                              'best_fitness': halloffame[0].fitness.values if len(halloffame) > 0 else np.inf}
         return end_func(vars_name_mapping[end_cond])
 
@@ -198,7 +207,6 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
     logbook.header = ['gen'] + (stats.fields if stats else [])
 
     gen = 0
-    evals = 0
     pred_evals = 0
     start_time = time.time()
 
@@ -206,6 +214,9 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     test_set_target = np.array([toolbox.target_func(p) for p in test_set])
     train_set_target = np.array([toolbox.target_func(p) for p in training_set])
+
+    global _POINT_EVALS
+    _POINT_EVALS = 0
 
     # set functions of first generation, needed for predictor initialization
     for ind in population:
@@ -216,28 +227,27 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         # print('{:.2e}'.format(evals), end='\r')
         gen += 1
         # get points to use
-        nevals = fp.next_generation(gen=gen, pop=population, training_set=training_set,
-                                    target_values=train_set_target, toolbox=toolbox,
-                                    effort=pred_evals / evals if evals != 0 else 0)
+        tmp = _POINT_EVALS
+        fp.next_generation(gen=gen, pop=population, training_set=training_set,
+                           target_values=train_set_target, toolbox=toolbox,
+                           effort=pred_evals / _POINT_EVALS if _POINT_EVALS != 0 else 0)
+        pred_evals += _POINT_EVALS - tmp
 
         predictor = fp.get_best_predictor()
-        pred_evals += nevals
-        evals += nevals
+
         # if we use new predictor, we have to re-evaluate the population
         if last_predictor is not None and sorted(predictor) != sorted(last_predictor):
             for ind in population:
                 ind.make_invalid()
         last_predictor = predictor
         # crossover, mutation and selection
-        offspring, nevals = toolbox.new_gen(population=population, points=training_set[predictor])
-        evals += nevals
+        offspring = toolbox.new_gen(population=population, points=training_set[predictor])
 
         population[:] = offspring
 
         # Update the hall of fame with the generated individuals and gen values of the best individual
         halloffame.update(population)
         best_sol_vals = halloffame[0].eval_at_points(training_set)
-        evals += len(training_set)
 
         # get test_set fitness
         best_ind = halloffame[0]
@@ -246,7 +256,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, evals=evals, test_set_f=test_set_f,
+        logbook.record(gen=gen, evals=_POINT_EVALS, test_set_f=test_set_f,
                        predictor=predictor, best_sol_vals=best_sol_vals,
                        time=time.time() - start_time, **record)
 
