@@ -63,7 +63,7 @@ class EvolvingFitnessPredictor(FitnessPredictor):
 
 class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
 
-    def __init__(self, training_set_size, size, mutpb, cxpb, init_read_length=8, test_cases=None):
+    def __init__(self, training_set_size, size, mutpb, cxpb, init_read_length, test_cases=None):
         super().__init__(training_set_size, size, test_cases=test_cases)
         self._cxpb = cxpb
         self._mutpb = mutpb
@@ -71,6 +71,7 @@ class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
 
     @property
     def test_cases(self):
+        # use set to remove duplicates
         return np.array(set(self._test_cases[:self.read_length]))
 
     def crossover(self, other):
@@ -138,12 +139,10 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
                                                          kwargs['toolbox'])[0]
                 nevals += len(kwargs['training_set'])
         if kwargs['effort'] <= self.effort_tresh:
-            #print(kwargs['gen'], self.pred_evolution_gen)
             self.pred_evolution_gen += 1
             nevals += self.deterministic_crowding(kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
             # add  new trainer every 100 predictor generations
             if self.pred_evolution_gen % self.new_trainer_period == 0:
-                #print('new_trainer')
                 nevals += self.add_fitness_trainer(kwargs['pop'], kwargs['training_set'], kwargs['target_values'], kwargs['toolbox'])
 
         return nevals
@@ -209,6 +208,27 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         self.trainers_fitness.appendleft(toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0])
         nevals += len(training_set)
         return nevals
+
+
+class DrahosovaSekaninaFPManager(FitnessPredictorManager):
+
+    def __init__(self, training_set_size, num_predictors=32, mutpb=0.2, cxpb=1.0,
+                 num_trainers=16, generation_period=100, init_read_length=5):
+        super().__init__(training_set_size)
+        self.predictor_pop = [AdaptiveSizeFitnessPredictor(training_set_size, training_set_size, mutpb, cxpb, init_read_length)
+                              for _ in range(num_predictors)]
+        self.trainers_pop = [None] * num_trainers
+        self.trainers_objective_f = [None] * num_trainers
+        self.best_pred = None
+        self.best_pred_f = -np.inf
+        self.read_length = init_read_length
+        self.generation_period = generation_period
+
+    def get_best_predictor(self):
+        return self.best_pred
+
+    def next_generation(self, kwargs):
+        pass
 
 
 class StaticRandom(FitnessPredictorManager):
