@@ -51,20 +51,20 @@ class EvolvingFitnessPredictor(FitnessPredictor):
     def mutate(self):
         for i in range(self.size):
             if random.random() < self.mutpb:
-                self.test_cases[i] = random.randint(0, self.training_set_size - 1)
+                self._test_cases[i] = random.randint(0, self.training_set_size - 1)
 
     def crossover(self, other):
         if self.size != other.size:
             raise ValueError('predictors must have same size')
         if random.random() < self.cxpb:
             xo_point = random.randint(0, self.size - 1)
-            self.test_cases[:xo_point] = other.test_cases[:xo_point]
+            self._test_cases[:xo_point] = other._test_cases[:xo_point]
 
 
 class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
 
     def __init__(self, training_set_size, size, mutpb, cxpb, init_read_length, test_cases=None):
-        super().__init__(training_set_size, size, test_cases=test_cases)
+        super().__init__(training_set_size, size, mutpb, cxpb, test_cases=test_cases)
         self._cxpb = cxpb
         self._mutpb = mutpb
         self.read_length = init_read_length
@@ -72,14 +72,14 @@ class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
     @property
     def test_cases(self):
         # use set to remove duplicates
-        return np.array(set(self._test_cases[:self.read_length]))
+        return np.array(list(set(self._test_cases[:self.read_length])))
 
     def crossover(self, other):
         if self.size != other.size:
             raise ValueError('predictors must have same size')
         if random.random() < self.cxpb:
             xo_point = random.randint(0, self.read_length - 1)
-            self.test_cases[:xo_point] = other.test_cases[:xo_point]
+            self._test_cases[:xo_point] = other._test_cases[:xo_point]
 
 
 class FitnessPredictorManager():
@@ -180,7 +180,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
     def predictor_fitness(self, p, training_set, target_values, toolbox):
         predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0]
                                for t in self.trainers_pop]
-        # negative so that we want to find maximal fitness
+        # negative because we want to find maximal fitness
         return -math.fsum(map(lambda x: abs(x[0] - x[1]), zip(predicted_fitnesses, self.trainers_fitness))) / len(self.trainers_pop)
 
     def add_fitness_trainer(self, pop, training_set, target_values, toolbox):
@@ -205,18 +205,108 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         super().__init__(training_set_size)
         self.predictor_pop = [AdaptiveSizeFitnessPredictor(training_set_size, training_set_size, mutpb, cxpb, init_read_length)
                               for _ in range(num_predictors)]
-        self.trainers_pop = [None] * num_trainers
-        self.trainers_objective_f = [None] * num_trainers
+        self.trainers_pop = deque([None] * num_trainers)
+        self.trainers_objective_f = deque([None] * num_trainers)
         self.best_pred = None
         self.best_pred_f = -np.inf
         self.read_length = init_read_length
         self.generation_period = generation_period
 
-    def get_best_predictor(self):
-        return self.best_pred
+        self.last_read_length_update_gen = 0
+        self.last_read_length_update_objective_fitness = 0
 
-    def next_generation(self, kwargs):
+        self.last_gen_subjective_fitness = np.inf
+
+        self.training_set_size = training_set_size
+
+    def get_best_predictor(self):
+        return self.best_pred.test_cases
+
+    def next_generation(self, **kwargs):
+        # not initialized
+        if self.trainers_pop[0] is None:
+            self.trainers_pop = deque([copy.deepcopy(random.choice(kwargs['pop'])) for _ in range(len(self.trainers_pop))])
+            for i, t in enumerate(self.trainers_pop):
+                self.trainers_objective_f[i] = \
+                    kwargs['toolbox'].individual_fitness(t, kwargs['training_set'],
+                                                         kwargs['target_values'],
+                                                         kwargs['toolbox'])[0]
+
+        # time to perform next generation
+        if kwargs['gen'] % self.generation_period == 1:
+            selected = self.tournament_selection(len(self.trainers_pop) * 2, kwargs['training_set'],
+                                                 kwargs['target_values'], kwargs['toolbox'])
+            for i in range(0, len(selected) - 1, 2):
+                p1, p2 = selected[i], selected[i + 1]
+                p1.crossover(p2)
+                p1.mutate()
+                self.predictor_pop[i // 2] = p1
+
+        sub_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'][self.best_pred.test_cases],
+                                                     kwargs['target_values'][self.best_pred.test_cases],
+                                                     kwargs['toolbox'])[0]
+        # time to update read_length
+        if sub_f < self.last_gen_subjective_fitness:
+            obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
+                                                         kwargs['target_values'],
+                                                         kwargs['toolbox'])[0]
+            if kwargs['gen'] > 0:
+                velocity = (self.last_read_length_update_objective_fitness - obj_f) / (self.last_read_length_update_gen - kwargs['gen'])
+            else:
+                velocity = 1
+
+            inaccuracy = sub_f / obj_f
+            self.update_read_length(velocity, inaccuracy)
+
+            self.last_gen_subjective_fitness = sub_f
+            self.last_read_length_update_gen = kwargs['gen']
+            self.last_read_length_update_objective_fitness = obj_f
+
+        self.add_fitness_trainer()
+
+    def update_read_length(self, velocity, inaccuracy):
+        # NOTE: rules are different because they use different fitness function in the article
+        if inaccuracy < 0.35:
+            c = 1.2
+        elif abs(velocity) < 0.001:
+            c = 0.9
+        elif velocity > 0:
+            c = 0.96
+        elif 0 < velocity <= 0.1:
+            c = 1.07
+        else:
+            c = 1.0
+        self.read_length = int(self.read_length * c)
+        self.read_length = max(5, self.read_length)
+        self.read_length = min(self.read_length, self.training_set_size)
+
+        for p in self.predictor_pop:
+            p.read_length = self.read_length
+        self.best_pred.read_length = self.read_length
+
+    def add_fitness_trainer(self):
         pass
+
+    def tournament_selection(self, n, training_set, target_values, toolbox, tournament_size=2):
+        fitnesses = {p: self.predictor_fitness(p, training_set, target_values, toolbox) for p in self.predictor_pop}
+        # update best predictor
+        for p, f in fitnesses.items():
+            if f > self.best_pred_f:
+                self.best_pred_f = f
+                self.best_pred = copy.deepcopy(p)
+        ret = []
+        for _ in range(n):
+            contenders = [random.choice(self.predictor_pop) for _ in range(tournament_size)]
+            contenders_f = [fitnesses[p] for p in contenders]
+            winner = copy.deepcopy(contenders[np.argmax(contenders_f)])
+            ret.append(winner)
+        return ret
+
+    def predictor_fitness(self, p, training_set, target_values, toolbox):
+        predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)[0]
+                               for t in self.trainers_pop]
+        # negative because we want to find maximal fitness
+        return -math.fsum(map(lambda x: abs(x[0] - x[1]), zip(predicted_fitnesses, self.trainers_objective_f))) / len(self.trainers_pop)
 
 
 class StaticRandom(FitnessPredictorManager):
