@@ -173,8 +173,17 @@ def target_func(x):
     return output_vals[0]
 
 
-def symbreg_fitness(errors):
+def mean_abs_err(errors):
     return math.fsum(map(abs, errors)) / len(errors),
+
+
+def hit_rate(errors, epsilon):
+    return np.sum(np.abs(errors) < epsilon) / len(errors),
+
+
+def fitness_diff(f1, f2):
+    assert(len(f1.values) == len(f2.values))
+    return [v1 - v2 for v1, v2 in zip(f1.values, f2.values)]
 
 
 def individual_fitness(ind, points, target, toolbox):
@@ -183,7 +192,7 @@ def individual_fitness(ind, points, target, toolbox):
     individuals set_func() has to have been called before
     '''
     vals = ind.eval_at_points(points)
-    return toolbox.evaluate(target - vals)
+    return _used_fitness(toolbox.evaluate(target - vals))
 
 
 def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, training_set, test_set, halloffame,
@@ -268,20 +277,22 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
 
 _toolbox_registered = False
+_used_fitness = creator.FitnessMax
 
 
 def symb_reg_initialize():
     # initialization
     global _toolbox_registered
     if not _toolbox_registered:
-        creator.create("Individual", SymbRegTree, fitness=creator.FitnessMin)
+        creator.create("Individual", SymbRegTree, fitness=_used_fitness)
         toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
         toolbox.register("compile", gp.compile, pset=pset)
-        toolbox.register("evaluate", symbreg_fitness)
+        toolbox.register("evaluate", functools.partial(hit_rate, epsilon=0.5))
         toolbox.register("individual_fitness", individual_fitness)
         toolbox.register("target_func", target_func)
         toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
+        toolbox.register("fitness_diff", fitness_diff)
         #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
         _toolbox_registered = True
 
