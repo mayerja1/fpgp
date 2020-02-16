@@ -220,19 +220,23 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         self.training_set_size = training_set_size
 
     def get_best_predictor(self):
+        #print(self.best_pred_f)
+        print(self.best_pred.read_length)
         return self.best_pred.test_cases
 
     def next_generation(self, **kwargs):
         # not initialized
         if self.trainers_pop[0] is None:
             self.trainers_pop = deque([copy.deepcopy(random.choice(kwargs['pop'])) for _ in range(len(self.trainers_pop))])
+            # TODO: this could be a one-liner
             for i, t in enumerate(self.trainers_pop):
                 self.trainers_objective_f[i] = \
                     kwargs['toolbox'].individual_fitness(t, kwargs['training_set'],
                                                          kwargs['target_values'],
                                                          kwargs['toolbox'])[0]
 
-        # time to perform next generation
+        # time to perform next generation (== 1 is because first is generation 1
+        # and we need to run this in order to initialize)
         if kwargs['gen'] % self.generation_period == 1:
             selected = self.tournament_selection(len(self.trainers_pop) * 2, kwargs['training_set'],
                                                  kwargs['target_values'], kwargs['toolbox'])
@@ -242,11 +246,14 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
                 p1.mutate()
                 self.predictor_pop[i // 2] = p1
 
-        sub_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'][self.best_pred.test_cases],
-                                                     kwargs['target_values'][self.best_pred.test_cases],
+        sub_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'][self.get_best_predictor()],
+                                                     kwargs['target_values'][self.get_best_predictor()],
                                                      kwargs['toolbox'])[0]
+        obj_f = None
         # time to update read_length
-        if sub_f < self.last_gen_subjective_fitness:
+        # TODO: 5000 is way to have to make any difference
+        if sub_f < self.last_gen_subjective_fitness \
+           or self.last_read_length_update_gen - kwargs['gen'] >= 5000:
             obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
                                                          kwargs['target_values'],
                                                          kwargs['toolbox'])[0]
@@ -262,7 +269,21 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             self.last_read_length_update_gen = kwargs['gen']
             self.last_read_length_update_objective_fitness = obj_f
 
-        self.add_fitness_trainer()
+        # check if we want to add a new trainer
+        # get subjective fitness of the whole trainers population
+        trainers_sub_f = [kwargs['toolbox'].individual_fitness(t, kwargs['training_set'][self.get_best_predictor()],
+                                                               kwargs['target_values'][self.get_best_predictor()],
+                                                               kwargs['toolbox'])[0]
+                          for t in self.trainers_pop]
+        # if the current best solution is better than best trainer
+        if sub_f < min(trainers_sub_f):
+            # compute objective fitness if necessary
+            if obj_f is None:
+                obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
+                                                             kwargs['target_values'],
+                                                             kwargs['toolbox'])[0]
+            # replace oldest trainer
+            self.add_fitness_trainer(kwargs['best_solution'], obj_f)
 
     def update_read_length(self, velocity, inaccuracy):
         # NOTE: rules are different because they use different fitness function in the article
@@ -284,8 +305,11 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             p.read_length = self.read_length
         self.best_pred.read_length = self.read_length
 
-    def add_fitness_trainer(self):
-        pass
+    def add_fitness_trainer(self, t, obj_f):
+        self.trainers_pop.pop()
+        self.trainers_objective_f.pop()
+        self.trainers_pop.appendleft(t)
+        self.trainers_objective_f.appendleft(obj_f)
 
     def tournament_selection(self, n, training_set, target_values, toolbox, tournament_size=2):
         fitnesses = {p: self.predictor_fitness(p, training_set, target_values, toolbox) for p in self.predictor_pop}

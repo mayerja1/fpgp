@@ -1,0 +1,8 @@
+[
+  {"name": "f2_3.5e7_evals_static", "run_args":
+    {"end_cond": "evals", "end_func": "lambda x: x >= 3.5e7", "fitness_predictor": "static", "predictor_kw":{"size": 32}},
+     "runs": 5, "dataset": "datasets/f2.npz"},
+ {"name": "f2_3.5e7_evals_dynamic", "run_args":
+   {"end_cond": "evals", "end_func": "lambda x: x >= 3.5e7", "fitness_predictor": "dynamic", "predictor_kw":{"size": 32}},
+    "runs": 5, "dataset": "datasets/f2.npz"}
+]

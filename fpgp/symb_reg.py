@@ -230,7 +230,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         tmp = _POINT_EVALS
         fp.next_generation(gen=gen, pop=population, training_set=training_set,
                            target_values=train_set_target, toolbox=toolbox,
-                           effort=pred_evals / _POINT_EVALS if _POINT_EVALS != 0 else 0)
+                           effort=pred_evals / _POINT_EVALS if _POINT_EVALS != 0 else 0,
+                           best_solution=halloffame[0] if len(halloffame) > 0 else random.choice(population))
         pred_evals += _POINT_EVALS - tmp
 
         predictor = fp.get_best_predictor()
@@ -258,7 +259,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         record = stats.compile(population) if stats else {}
         logbook.record(gen=gen, evals=_POINT_EVALS, test_set_f=test_set_f,
                        predictor=predictor, best_sol_vals=best_sol_vals,
-                       time=time.time() - start_time, **record)
+                       time=time.time() - start_time, pred_size=len(predictor), **record)
 
         if verbose:
             print(logbook.stream)
@@ -303,7 +304,8 @@ def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact',
     hof = tools.HallOfFame(1)
 
     predictors = {'exact': fitness_pred.ExactFitness(len(trn_x)),
-                  'coev': fitness_pred.SchmidtLipsonFPManager(len(trn_x), **predictor_kw),
+                  'SLcoev': fitness_pred.SchmidtLipsonFPManager(len(trn_x), **predictor_kw),
+                  'DScoev': fitness_pred.DrahosovaSekaninaFPManager(len(trn_x), **predictor_kw),
                   'static': fitness_pred.StaticRandom(len(trn_x), **predictor_kw),
                   'dynamic': fitness_pred.DynamicRandom(len(trn_x), **predictor_kw)
                   }

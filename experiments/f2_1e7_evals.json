@@ -1,4 +1,11 @@
 [
-    {"name": "f2_1e7_evals_coev", "run_args": {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "SchmidtLipson"}, "runs": 1, "dataset": "datasets/f2.npz"},
-    {"name": "f2_1e7_evals_exact", "run_args": {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "exact"}, "runs": 1, "dataset": "datasets/f2.npz"}
+    {"name": "f2_1e7_evals_mod_coev", "run_args":
+      {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "coev_modified", "predictor_kw":{"predictors_size": 32}},
+       "runs": 50, "dataset": "datasets/f2.npz"},
+    {"name": "f2_1e7_evals_coev", "run_args":
+      {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "SchmidtLipson"},
+      "runs": 50, "dataset": "datasets/f2.npz"},
+    {"name": "f2_1e7_evals_exact", "run_args":
+      {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "exact"},
+      "runs": 50, "dataset": "datasets/f2.npz"}
 ]

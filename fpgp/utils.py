@@ -94,9 +94,7 @@ def create_dataset(fname, func):
     tst_x = np.concatenate([trn_x, np.random.random(200) * (x2 - x1) + x1])
     tst_y = func(tst_x)
     np.savez(fname, trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
-    import matplotlib.pyplot as plt
-    plt.scatter(tst_x[200:], tst_y[200:])
-    plt.show()
+
 
 if __name__ == '__main__':
     create_dataset('datasets/f2_mod', lambda x: np.exp(np.abs(x)) * np.sin(x))
