@@ -181,6 +181,10 @@ def hit_rate(errors, epsilon):
     return np.sum(np.abs(errors) < epsilon) / len(errors),
 
 
+def mean_sq_err(errors):
+    return math.fsum(map(lambda x: x*x, errors)) / len(errors),
+
+
 def fitness_diff(f1, f2):
     assert(len(f1.values) == len(f2.values))
     return [v1 - v2 for v1, v2 in zip(f1.values, f2.values)]
@@ -289,6 +293,7 @@ def symb_reg_initialize():
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
         toolbox.register("compile", gp.compile, pset=pset)
         toolbox.register("evaluate", functools.partial(hit_rate, epsilon=0.5))
+        #toolbox.register("evaluate", mean_abs_err)
         toolbox.register("individual_fitness", individual_fitness)
         toolbox.register("target_func", target_func)
         toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
