@@ -109,9 +109,9 @@ class ExactFitness(FitnessPredictorManager):
 
 class SchmidtLipsonFPManager(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, predictors_size=8, num_predictors=8,
+    def __init__(self, training_set_size, pred_size=8, num_predictors=8,
                  mutpb=0.1, cxpb=0.5, num_trainers=10, effort_tresh=0.05, new_trainer_period=100, **kwargs):
-        self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, predictors_size, mutpb, cxpb)
+        self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, pred_size, mutpb, cxpb)
                               for _ in range(num_predictors)]
 
         self.trainers_pop = [None] * num_trainers
@@ -123,6 +123,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         self.new_trainer_period = int(new_trainer_period)
 
     def get_best_predictor(self):
+        #print(self.best_pred_f)
         return self.best_pred.test_cases
 
     def next_generation(self, **kwargs):
@@ -195,13 +196,13 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
         self.trainers_fitness.pop()
         new_trainer = copy.deepcopy(pop[np.argmax(solutions_variances)])
         self.trainers_pop.appendleft(new_trainer)
-        self.trainers_fitness.appendleft(toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox)[0])
+        self.trainers_fitness.appendleft(toolbox.individual_fitness(new_trainer, training_set, target_values, toolbox))
 
 
 class DrahosovaSekaninaFPManager(FitnessPredictorManager):
 
     def __init__(self, training_set_size, num_predictors=32, mutpb=0.2, cxpb=1.0,
-                 num_trainers=16, generation_period=100, init_read_length=5):
+                 num_trainers=16, generation_period=100, init_read_length=5, **kwargs):
         super().__init__(training_set_size)
         self.predictor_pop = [AdaptiveSizeFitnessPredictor(training_set_size, training_set_size, mutpb, cxpb, init_read_length)
                               for _ in range(num_predictors)]
@@ -221,7 +222,6 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
 
     def get_best_predictor(self):
         #print(self.best_pred_f)
-        #print(self.best_pred.read_length)
         return self.best_pred.test_cases
 
     def next_generation(self, **kwargs):
@@ -251,10 +251,10 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
                                                      kwargs['toolbox'])
         obj_f = None
         # time to update read_length
-        # TODO: 5000 is way to have to make any difference
+        # TODO: 5000 is way too small to make any difference
         if self.last_gen_subjective_fitness is None \
            or sub_f > self.last_gen_subjective_fitness \
-           or self.last_read_length_update_gen - kwargs['gen'] >= 5000:
+           or kwargs['gen'] - self.last_read_length_update_gen >= 5000:
             obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
                                                          kwargs['target_values'],
                                                          kwargs['toolbox'])
@@ -287,10 +287,10 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             self.add_fitness_trainer(kwargs['best_solution'], obj_f)
 
     def update_read_length(self, velocity, inaccuracy):
-        # NOTE: rules are different because they use different fitness function in the article
+        #print(inaccuracy)
         if inaccuracy > 2.7:
             c = 1.2
-        elif abs(velocity) < 0.001:
+        elif abs(velocity) <= 0.001:
             c = 0.9
         elif velocity < 0:
             c = 0.96
@@ -305,6 +305,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         for p in self.predictor_pop:
             p.read_length = self.read_length
         self.best_pred.read_length = self.read_length
+        print(self.read_length)
 
     def add_fitness_trainer(self, t, obj_f):
         self.trainers_pop.pop()
@@ -331,7 +332,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         predicted_fitnesses = [toolbox.individual_fitness(t, training_set[p.test_cases], target_values[p.test_cases], toolbox)
                                for t in self.trainers_pop]
         # negative because we want to find maximal fitness
-        return -math.fsum(map(lambda x: toolbox.fitness_diff(x[0], x[1])[0], zip(predicted_fitnesses, self.trainers_objective_f))) / len(self.trainers_pop)
+        return -math.fsum(map(lambda x: abs(toolbox.fitness_diff(x[0], x[1])[0]), zip(predicted_fitnesses, self.trainers_objective_f))) / len(self.trainers_pop)
 
 
 class StaticRandom(FitnessPredictorManager):
