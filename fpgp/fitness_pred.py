@@ -221,7 +221,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         self.training_set_size = training_set_size
 
     def get_best_predictor(self):
-        #print(self.best_pred_f)
+        #print(self.read_length)
         return self.best_pred.test_cases
 
     def next_generation(self, **kwargs):
@@ -253,13 +253,13 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         # time to update read_length
         # TODO: 5000 is way too small to make any difference
         if self.last_gen_subjective_fitness is None \
-           or sub_f > self.last_gen_subjective_fitness \
-           or kwargs['gen'] - self.last_read_length_update_gen >= 5000:
+           or sub_f >= self.last_gen_subjective_fitness \
+           or kwargs['gen'] - self.last_read_length_update_gen >= 1000:
             obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
                                                          kwargs['target_values'],
                                                          kwargs['toolbox'])
             if kwargs['gen'] > 1:
-                velocity = kwargs['toolbox'].fitness_diff(self.last_read_length_update_objective_fitness, obj_f)[0] / (self.last_read_length_update_gen - kwargs['gen'])
+                velocity = kwargs['toolbox'].fitness_diff(obj_f, self.last_read_length_update_objective_fitness)[0] / (kwargs['gen'] - self.last_read_length_update_gen)
             else:
                 velocity = 1
 
@@ -287,8 +287,8 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             self.add_fitness_trainer(kwargs['best_solution'], obj_f)
 
     def update_read_length(self, velocity, inaccuracy):
-        #print(inaccuracy)
-        if inaccuracy > 2.7:
+        #print(inaccuracy, velocity, self.read_length)
+        '''if inaccuracy > 2.7:
             c = 1.2
         elif abs(velocity) <= 0.001:
             c = 0.9
@@ -296,6 +296,17 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             c = 0.96
         elif 0 < velocity <= 0.1:
             c = 1.07
+        else:
+            c = 1.0'''
+
+        if inaccuracy < 1 / 1.5:
+            c = 1.2
+        elif abs(inaccuracy - 1) <= 0.2:
+            c = 1.0
+        elif abs(velocity) <= 0.001:
+            c = 1.07
+        elif velocity > 0:
+            c = 1.1
         else:
             c = 1.0
         self.read_length = int(self.read_length * c)
@@ -305,7 +316,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         for p in self.predictor_pop:
             p.read_length = self.read_length
         self.best_pred.read_length = self.read_length
-        print(self.read_length)
+        #print(self.read_length)
 
     def add_fitness_trainer(self, t, obj_f):
         self.trainers_pop.pop()

@@ -2,7 +2,7 @@
 import math
 import numpy as np
 import time
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import random
 import operator
 import traceback
@@ -237,7 +237,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     # Begin the generational process
     while not _terminate():
-        # print('{:.2e}'.format(evals), end='\r')
+        #print('{:.2e}, {}'.format(_POINT_EVALS, gen), end='\r')
         gen += 1
         # get points to use
         tmp = _POINT_EVALS
@@ -281,7 +281,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
 
 _toolbox_registered = False
-_used_fitness = creator.FitnessMax
+_used_fitness = creator.FitnessMin
 
 
 def symb_reg_initialize():
@@ -292,8 +292,8 @@ def symb_reg_initialize():
         toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
         toolbox.register("compile", gp.compile, pset=pset)
-        toolbox.register("evaluate", functools.partial(hit_rate, epsilon=0.5))
-        #toolbox.register("evaluate", mean_abs_err)
+        #toolbox.register("evaluate", functools.partial(hit_rate, epsilon=0.5))
+        toolbox.register("evaluate", mean_abs_err)
         toolbox.register("individual_fitness", individual_fitness)
         toolbox.register("target_func", target_func)
         toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
