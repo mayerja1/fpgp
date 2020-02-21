@@ -59,8 +59,7 @@ class LoadedLogs:
         self._path = path
 
     def __iter__(self):
-        for l in self.get_logs_from_folder():
-            yield l
+        yield from self.get_logs_from_folder()
 
     def __len__(self):
         len_ = 0
