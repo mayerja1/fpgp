@@ -28,8 +28,10 @@ CXPB = 0.5
 MUTPB = 0.1
 POP_SIZE = 128
 
-# used dataset, trn = train, tst = test, x = input, y = output
-trn_x = trn_y = tst_x = tst_y = None
+'''
+used datasets, (n, k + 1) numpy arrays, each row having k inputs and one output
+'''
+trn = tst = None
 
 # counter of point evaluations
 _POINT_EVALS = 0
@@ -43,6 +45,11 @@ def increase_evals(func):
         return func(*args, **kwargs)
     return decorated
 
+def unpack_args(func):
+    def decorated(x):
+        return func(*x)
+    return decorated
+
 
 class SymbRegTree(gp.PrimitiveTree):
 
@@ -51,6 +58,9 @@ class SymbRegTree(gp.PrimitiveTree):
     it is a significant speedup of the program
     there is no reason to copy these attributes because
     for individuals with invalid fitness they are computed again
+
+    functions having 'points' parameter expect rows of dataset with last value
+    being the expected one
     '''
     deepcopy_ignorelist = ('values', 'error_vec')
 
@@ -74,11 +84,11 @@ class SymbRegTree(gp.PrimitiveTree):
         self.func = None
 
     def set_func(self, compile_func):
-        self.func = increase_evals(compile_func(self))
+        self.func = increase_evals(unpack_args(compile_func(self)))
 
     def set_values(self, points, compile_func):
         self.set_func(compile_func)
-        self.values = [self.func(p) for p in points]
+        self.values = [self.func(p) for p in points[:, :-1]]
 
     def set_error_vec(self, target_values):
         assert(len(self.values) == len(target_values))
@@ -86,7 +96,7 @@ class SymbRegTree(gp.PrimitiveTree):
 
     def eval_at_points(self, points):
         assert(self.func is not None)
-        return [self.func(p) for p in points]
+        return [self.func(p) for p in points[:, :-1]]
 
 
 def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
@@ -165,12 +175,10 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False)
 
 
-@functools.lru_cache(maxsize=400)
+#@functools.lru_cache(maxsize=400)
 def target_func(x):
-    # simpy return y-values from training/testing data
-    output_vals = np.concatenate([trn_y[trn_x == x], tst_y[tst_x == x]])
-    assert(len(output_vals) > 0)
-    return output_vals[0]
+    # simpy return last value from the row
+    return x[-1]
 
 
 def mean_abs_err(errors):
@@ -319,15 +327,15 @@ def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact',
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
-    predictors = {'exact': fitness_pred.ExactFitness(len(trn_x)),
-                  'SLcoev': fitness_pred.SchmidtLipsonFPManager(len(trn_x), **predictor_kw),
-                  'DScoev': fitness_pred.DrahosovaSekaninaFPManager(len(trn_x), **predictor_kw),
-                  'static': fitness_pred.StaticRandom(len(trn_x), **predictor_kw),
-                  'dynamic': fitness_pred.DynamicRandom(len(trn_x), **predictor_kw)
+    predictors = {'exact': fitness_pred.ExactFitness(len(trn)),
+                  'SLcoev': fitness_pred.SchmidtLipsonFPManager(len(trn), **predictor_kw),
+                  'DScoev': fitness_pred.DrahosovaSekaninaFPManager(len(trn), **predictor_kw),
+                  'static': fitness_pred.StaticRandom(len(trn), **predictor_kw),
+                  'dynamic': fitness_pred.DynamicRandom(len(trn), **predictor_kw)
                   }
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
-                                predictors[fitness_predictor], trn_x, tst_x, halloffame=hof,
+                                predictors[fitness_predictor], trn, tst, halloffame=hof,
                                 stats=stats, verbose=False, epsilon=epsilon)
 
     return pop, log, hof
@@ -335,9 +343,8 @@ def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact',
 
 def load_dataset(fname):
     x = np.load(fname)
-    global trn_x, trn_y, tst_x, tst_y
-    trn_x, trn_y = x['trn_x'], x['trn_y']
-    tst_x, tst_y = x['tst_x'], x['tst_y']
+    global trn, tst
+    trn, tst = x['trn'], x['tst']
 
 
 def run_config(fname):
@@ -354,7 +361,7 @@ def run_config(fname):
         except FileExistsError:
             print('the experiment folder already exists...')
         # copy dataset, so that we know which dataset was used
-        np.savez(os.path.join(path, 'dataset.npz'), trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
+        np.savez(os.path.join(path, 'dataset.npz'), trn=trn, tst=tst)
         for i in range(experiment['runs']):
             print(f'starting run {i}')
             _, log, _ = run(**experiment['run_args'])

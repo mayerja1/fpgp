@@ -92,8 +92,10 @@ def create_dataset(fname, func):
     trn_y = func(trn_x)
     tst_x = np.concatenate([trn_x, np.random.random(200) * (x2 - x1) + x1])
     tst_y = func(tst_x)
-    np.savez(fname, trn_x=trn_x, trn_y=trn_y, tst_x=tst_x, tst_y=tst_y)
+    trn = np.column_stack([trn_x, trn_y])
+    tst = np.column_stack([tst_x, tst_y])
+    np.savez(fname, trn=trn, tst=tst)
 
 
 if __name__ == '__main__':
-    create_dataset('datasets/f2_mod', lambda x: np.exp(np.abs(x)) * np.sin(x))
+    create_dataset('datasets/f2', lambda x: np.exp(np.abs(x)) * np.sin(2*np.pi*x))
