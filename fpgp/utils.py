@@ -85,17 +85,19 @@ class LoadedLogs:
                 print('there are more folders in path, are you sure this is the right path?')
 
 
-def create_dataset(fname, func):
-    x1 = -3
-    x2 = 3
+def create_dataset(fname, func, description, x1, x2):
     trn_x = np.linspace(x1, x2, 200)
     trn_y = func(trn_x)
     tst_x = np.concatenate([trn_x, np.random.random(200) * (x2 - x1) + x1])
     tst_y = func(tst_x)
     trn = np.column_stack([trn_x, trn_y])
     tst = np.column_stack([tst_x, tst_y])
-    np.savez(fname, trn=trn, tst=tst)
+    np.savez(fname, trn=trn, tst=tst, description=description)
 
 
 if __name__ == '__main__':
-    create_dataset('datasets/f2', lambda x: np.exp(np.abs(x)) * np.sin(2*np.pi*x))
+    create_dataset('datasets/f1', lambda x: x**2 - x**3, 'f(x) = x^2 - x^3', -5, 5)
+    create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2*PI*x)', -3, 3)
+    create_dataset('datasets/f3', lambda x: x**2*np.exp(np.sin(x)) + x + np.sin(np.pi/4 - x**3), 'f(x) = x^2 * e^sin(x) + x + sin(PI/4 - x^3)', -10, 10)
+    create_dataset('datasets/f4', lambda x: np.exp(-x) * x**3 * np.sin(x) * np.cos(x) * (np.sin(x)**2 * np.cos(x) - 1), 'f(x) = e^(-x) * x^3 * sin(x) * cos(x) * (sin(x)^2 * cos(x) - 1)', 0, 10)
+    create_dataset('datasets/f5', lambda x: 10 / ((x - 3)**2 + 5), 'f(x) = 10 / ((x - 3)^2 + 5)', -2, 8)
