@@ -1,8 +1,0 @@
-[
-  {"name": "f1_3.5e7_evals_coev_32predsz", "run_args":
-    {"end_cond": "evals", "end_func": "lambda x: x >= 3.5e7", "fitness_predictor": "coev_modified", "predictor_kw":{"predictors_size": 32}},
-     "runs": 10, "dataset": "datasets/f1.npz"},
-  {"name": "f1_3.5e7_evals_exact", "run_args":
-    {"end_cond": "evals", "end_func": "lambda x: x >= 3.5e7", "fitness_predictor": "exact"},
-    "runs": 10, "dataset": "datasets/f1.npz"}
-]

@@ -1,0 +1,21 @@
+[
+  {"name": "f1/exact", "run_args":
+   {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "exact", "predictor_kw":{"pred_size": 32}},
+    "runs": 10, "dataset": "datasets/f1.npz"},
+
+  {"name": "f1/static", "run_args":
+   {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "static", "predictor_kw":{"pred_size": 32}},
+    "runs": 10, "dataset": "datasets/f1.npz"},
+
+  {"name": "f1/dynamic", "run_args":
+   {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "dynamic", "predictor_kw":{"pred_size": 32}},
+    "runs": 10, "dataset": "datasets/f1.npz"},
+
+  {"name": "f1/SLcoev", "run_args":
+   {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "SLcoev", "predictor_kw":{"pred_size": 32}},
+    "runs": 10, "dataset": "datasets/f1.npz"},
+
+  {"name": "f1/DScoev", "run_args":
+   {"end_cond": "evals", "end_func": "lambda x: x >= 1e7", "fitness_predictor": "DScoev", "predictor_kw":{}},
+    "runs": 10, "dataset": "datasets/f1.npz"}
+]
