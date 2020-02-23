@@ -348,8 +348,8 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
 
 class StaticRandom(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, size=8, **kwargs):
-        self.pred = FitnessPredictor(training_set_size, size)
+    def __init__(self, training_set_size, pred_size=8, **kwargs):
+        self.pred = FitnessPredictor(training_set_size, pred_size)
 
     def get_best_predictor(self):
         return self.pred.test_cases
@@ -360,8 +360,8 @@ class StaticRandom(FitnessPredictorManager):
 
 class DynamicRandom(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, size=8, **kwargs):
-        self.pred = FitnessPredictor(training_set_size, size)
+    def __init__(self, training_set_size, pred_size=8, **kwargs):
+        self.pred = FitnessPredictor(training_set_size, pred_size)
 
     def get_best_predictor(self):
         return self.pred.test_cases
