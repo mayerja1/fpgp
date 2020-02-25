@@ -281,6 +281,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
         record = stats.compile(population) if stats else {}
         logbook.record(gen=gen, evals=_POINT_EVALS, test_set_f=test_set_f,
                        predictor=predictor, best_sol_vals=best_sol_vals,
+                       best_sol_func=str(best_ind),
                        time=time.time() - start_time, pred_size=len(predictor), **record)
 
         if verbose:
