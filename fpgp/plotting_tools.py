@@ -58,7 +58,7 @@ def predictor_histogram(training_set, training_vals, log):
     ax2.legend(['f(x)'], loc=1)
 
 
-# methods is a list of lists of logbooks
+# methods is a list of lists of dicts
 def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
                         method_names=[], xlabel=None, ylabel=None, ignore_tresh=1e6):
     fig, ax = plt.subplots()
@@ -66,15 +66,15 @@ def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
     if min_x is None or max_x is None:
         min_x, max_x = np.inf, -np.inf
         for method in methods:
-            min_x = min(min_x, *[l.select(x)[0] for l in method])
-            max_x = max(max_x, *[l.select(x)[-1] for l in method])
+            min_x = min(min_x, *[l['logbook'].select(x)[0] for l in method])
+            max_x = max(max_x, *[l['logbook'].select(x)[-1] for l in method])
     points = np.linspace(min_x, max_x, num_points)
     xlabel = x if xlabel is None else xlabel
     ylabel = y if ylabel is None else ylabel
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     for i, method in enumerate(methods):
-        xss, yss = utils.get_xss_yss_from_logbooks(method, x, y)
+        xss, yss = utils.get_xss_yss_from_logbooks([l['logbook'] for l in method], x, y)
         vals = utils.vals_at_points(xss, yss, points)
         if vals[vals > ignore_tresh].size > 0:
             warnings.warn(f'{vals[vals > ignore_tresh].size} values were ignored for being too high')

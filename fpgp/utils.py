@@ -79,10 +79,20 @@ class LoadedLogs:
                 continue
             try:
                 with open(os.path.join(self.path, l), 'rb') as fp:
-                    log = pickle.load(fp)
+                    log = {'logbook': pickle.load(fp), 'path': os.path.join(self.path, l)}
                 yield log
             except IsADirectoryError:
                 print('there are more folders in path, are you sure this is the right path?')
+
+
+def get_results(path):
+    logs, names = [], []
+    for fname in os.listdir(path):
+        full_path = os.path.join(path, fname)
+        if os.path.isdir(os.path.join(path, fname)):
+            logs.append(LoadedLogs(full_path))
+            names.append(fname)
+    return logs, names
 
 
 def create_dataset(fname, func, description, x1, x2):
@@ -96,8 +106,10 @@ def create_dataset(fname, func, description, x1, x2):
 
 
 if __name__ == '__main__':
-    create_dataset('datasets/f1', lambda x: x**2 - x**3, 'f(x) = x^2 - x^3', -5, 5)
-    create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2*PI*x)', -3, 3)
-    create_dataset('datasets/f3', lambda x: x**2*np.exp(np.sin(x)) + x + np.sin(np.pi/4 - x**3), 'f(x) = x^2 * e^sin(x) + x + sin(PI/4 - x^3)', -10, 10)
-    create_dataset('datasets/f4', lambda x: np.exp(-x) * x**3 * np.sin(x) * np.cos(x) * (np.sin(x)**2 * np.cos(x) - 1), 'f(x) = e^(-x) * x^3 * sin(x) * cos(x) * (sin(x)^2 * cos(x) - 1)', 0, 10)
-    create_dataset('datasets/f5', lambda x: 10 / ((x - 3)**2 + 5), 'f(x) = 10 / ((x - 3)^2 + 5)', -2, 8)
+    #create_dataset('datasets/f1', lambda x: x**2 - x**3, 'f(x) = x^2 - x^3', -5, 5)
+    #create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2*PI*x)', -3, 3)
+    #create_dataset('datasets/f3', lambda x: x**2*np.exp(np.sin(x)) + x + np.sin(np.pi/4 - x**3), 'f(x) = x^2 * e^sin(x) + x + sin(PI/4 - x^3)', -10, 10)
+    #create_dataset('datasets/f4', lambda x: np.exp(-x) * x**3 * np.sin(x) * np.cos(x) * (np.sin(x)**2 * np.cos(x) - 1), 'f(x) = e^(-x) * x^3 * sin(x) * cos(x) * (sin(x)^2 * cos(x) - 1)', 0, 10)
+    #create_dataset('datasets/f5', lambda x: 10 / ((x - 3)**2 + 5), 'f(x) = 10 / ((x - 3)^2 + 5)', -2, 8)
+    #create_dataset('datasets/moje', lambda x: (x - 1000)**2 + 1000, '(x - 1000)^2 + 1000', -10, 10)
+    ...
