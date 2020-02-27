@@ -87,6 +87,17 @@ def show_performance(log, x, y):
     compare_performance([[log]], x, y, min_x=min(log.select(x)), max_x=max(log.select(x)), ignore_tresh=np.inf)
 
 
+def two_stats_graph(log, stat1, stat2):
+    step = len(log.select('gen')) // 10
+    fig, ax1 = plt.subplots()
+    ax1.plot(log.select('gen')[::step], log.select(stat1)[::step], color='blue')
+    ax1.set_ylabel(stat1)
+    ax1.legend([stat1], loc=2)
+    ax2 = ax1.twinx()
+    ax2.plot(log.select('gen')[::step], log.select(stat2)[::step], color='red')
+    ax2.set_ylabel(stat2)
+    ax2.legend([stat2], loc=1)
+
 if __name__ == '__main__':
     import pickle
     with open('results10.p', 'rb') as f:
