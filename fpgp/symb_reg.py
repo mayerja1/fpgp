@@ -24,7 +24,7 @@ from deap import algorithms
 from deap import creator
 
 # constants used by gp
-CXPB = 0.5
+CXPB = 1.0
 MUTPB = 0.1
 POP_SIZE = 128
 
@@ -176,7 +176,6 @@ def var_and_double_tournament(population, points, toolbox, cxpb, mutpb, fitness_
     return tools.selDoubleTournament(offspring, len(offspring), fitness_size, parsimony_size, False)
 
 
-#@functools.lru_cache(maxsize=400)
 def target_func(x):
     # simpy return last value from the row
     return x[-1]
