@@ -12,8 +12,8 @@ import pickle
 import functools
 import uuid
 
-from symb_reg_pset import pset
-from symb_reg_toolbox import toolbox
+import symb_reg_pset
+import symb_reg_toolbox
 import fitness_pred
 
 from deap import gp
@@ -97,6 +97,10 @@ class SymbRegTree(gp.PrimitiveTree):
     def eval_at_points(self, points):
         assert(self.func is not None)
         return [self.func(p) for p in points[:, :-1]]
+
+
+_used_fitness = creator.FitnessMin
+creator.create("Individual", SymbRegTree, fitness=_used_fitness)
 
 
 def deterministic_crowding(population, points, toolbox, cxpb, mutpb):
@@ -288,26 +292,22 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
     return population, logbook
 
 
-_toolbox_registered = False
-_used_fitness = creator.FitnessMin
+def symb_reg_initialize(arity):
+    pset = symb_reg_pset.init_pset(arity)
+    toolbox = symb_reg_toolbox.init_toolbox(pset)
 
+    
 
-def symb_reg_initialize():
-    # initialization
-    global _toolbox_registered
-    if not _toolbox_registered:
-        creator.create("Individual", SymbRegTree, fitness=_used_fitness)
-        toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
-        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-        toolbox.register("compile", gp.compile, pset=pset)
-        #toolbox.register("evaluate", functools.partial(hit_rate, epsilon=0.5))
-        toolbox.register("evaluate", mean_abs_err)
-        toolbox.register("individual_fitness", individual_fitness)
-        toolbox.register("target_func", target_func)
-        toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
-        toolbox.register("fitness_diff", fitness_diff)
-        #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
-        _toolbox_registered = True
+    toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register("compile", gp.compile, pset=pset)
+    #toolbox.register("evaluate", functools.partial(hit_rate, epsilon=0.5))
+    toolbox.register("evaluate", mean_abs_err)
+    toolbox.register("individual_fitness", individual_fitness)
+    toolbox.register("target_func", target_func)
+    toolbox.register("new_gen", deterministic_crowding, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB)
+    toolbox.register("fitness_diff", fitness_diff)
+    #toolbox.register("new_gen", var_and_double_tournament, toolbox=toolbox, cxpb=CXPB, mutpb=MUTPB, fitness_size=3, parsimony_size=1.4)
 
     # stats we want to keep track of
     stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
@@ -319,11 +319,11 @@ def symb_reg_initialize():
     mstats.register("min", np.min)
     mstats.register("max", np.max)
 
-    return mstats
+    return toolbox, mstats
 
 
-def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', predictor_kw={}, epsilon=1e-3):
-    stats = symb_reg_initialize()
+def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', predictor_kw={}, epsilon=1e-3, arity=1):
+    toolbox, stats = symb_reg_initialize(arity)
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
 
@@ -374,7 +374,7 @@ def run_config(fname):
                 np.savez(os.path.join(out_path, 'dataset.npz'), trn=trn, tst=tst)
                 end_func = get_partial_compare_func(cfg['limit_type'], cfg['end_treshold'])
                 load_dataset(data_path)
-                _, log, _ = run(cfg['end_cond'], end_func, pred, cfg['predictor_kw'])
+                _, log, _ = run(cfg['end_cond'], end_func, pred, cfg['predictor_kw'], arity=trn.shape[1] - 1)
                 with open(os.path.join(out_path, f'{uuid.uuid4()}.p'), 'wb') as fp:
                     pickle.dump(log, fp)
 
