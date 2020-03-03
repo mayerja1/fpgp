@@ -287,7 +287,6 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             self.add_fitness_trainer(kwargs['best_solution'], obj_f)
 
     def update_read_length(self, velocity, inaccuracy):
-        #print(inaccuracy, velocity, self.read_length)
         '''if inaccuracy > 2.7:
             c = 1.2
         elif abs(velocity) <= 0.001:
@@ -298,18 +297,22 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             c = 1.07
         else:
             c = 1.0'''
-
-        if inaccuracy < 1 / 1.5:
+        # over-fitting
+        if inaccuracy < 1 / 1.75:
             c = 1.2
+        # predictors are accurate enough
         elif abs(inaccuracy - 1) <= 0.2:
             c = 1.0
+        # stagnation
         elif abs(velocity) <= 0.001:
-            c = 1.07
+            c = 0.9
+        # detoriation
         elif velocity > 0:
-            c = 1.1
+            c = 0.9
+        # improvement
         else:
-            c = 1.0
-        self.read_length = int(self.read_length * c)
+            c = 1.1
+        self.read_length = int(round(self.read_length * c))
         self.read_length = max(5, self.read_length)
         self.read_length = min(self.read_length, self.training_set_size)
 
@@ -368,4 +371,3 @@ class DynamicRandom(FitnessPredictorManager):
 
     def next_generation(self, **kwargs):
         self.pred.random_predictor()
-        pass
