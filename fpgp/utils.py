@@ -95,7 +95,7 @@ def get_results(path):
     return logs, names
 
 
-def create_dataset(fname, func, description, x1, x2):
+def create_1d_dataset(fname, func, description, x1, x2):
     trn_x = np.linspace(x1, x2, 200)
     trn_y = func(trn_x)
     tst_x = np.concatenate([trn_x, np.random.random(200) * (x2 - x1) + x1])
@@ -105,6 +105,32 @@ def create_dataset(fname, func, description, x1, x2):
     np.savez(fname, trn=trn, tst=tst, description=description)
 
 
+def create_nd_dataset(fname, func, description, intervals, num_points):
+
+    def random_points(n):
+        points = np.zeros((n, len(intervals)))
+        for i, int_ in enumerate(intervals):
+            points[:, i] = np.random.rand(n) * (int_[1] - int_[0]) + int_[0]
+        return points
+
+    ranges = [np.linspace(*int, num_points) for int in intervals]
+    trn_x = np.array(np.meshgrid(*ranges)).T.reshape(-1, len(ranges))
+    trn_y = func(*trn_x.T)
+
+    trn = np.column_stack([trn_x, trn_y])
+
+    tst_x = np.row_stack([trn_x, random_points(len(trn_x))])
+    tst_y = func(*tst_x.T)
+
+    tst = np.column_stack([tst_x, tst_y])
+
+    np.savez(fname, trn=trn, tst=tst, description=description)
+
+
+def get_statistic_from_logs(stat_func, select_func, logs):
+    return stat_func([select_func(l) for l in logs])
+
+
 if __name__ == '__main__':
     #create_dataset('datasets/f1', lambda x: x**2 - x**3, 'f(x) = x^2 - x^3', -5, 5)
     #create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2*PI*x)', -3, 3)
@@ -112,4 +138,4 @@ if __name__ == '__main__':
     #create_dataset('datasets/f4', lambda x: np.exp(-x) * x**3 * np.sin(x) * np.cos(x) * (np.sin(x)**2 * np.cos(x) - 1), 'f(x) = e^(-x) * x^3 * sin(x) * cos(x) * (sin(x)^2 * cos(x) - 1)', 0, 10)
     #create_dataset('datasets/f5', lambda x: 10 / ((x - 3)**2 + 5), 'f(x) = 10 / ((x - 3)^2 + 5)', -2, 8)
     #create_dataset('datasets/moje', lambda x: (x - 1000)**2 + 1000, '(x - 1000)^2 + 1000', -10, 10)
-    ...
+    create_nd_dataset('', lambda x, y: np.add(x, y), '', [(-1, 1), (2, 3)], 5)
