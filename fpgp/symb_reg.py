@@ -2,7 +2,6 @@
 import math
 import numpy as np
 import time
-#import matplotlib.pyplot as plt
 import random
 import operator
 import traceback
@@ -349,30 +348,44 @@ def load_dataset(fname):
 
 
 def run_config(fname):
+
+    def get_partial_compare_func(limit_type, treshold):
+        mapping = {f.__name__: f for f in [operator.gt, operator.ge, operator.lt, operator.le]}
+        try:
+            return lambda x: mapping[limit_type](x, treshold)
+        except KeyError:
+            print('invalid limit type')
+            exit(1)
+
     with open(fname, 'r') as fp:
         cfg = json.load(fp)
-    for experiment in cfg:
-        print(f'starting experiment: {experiment["name"]}')
-        load_dataset(experiment['dataset'])
-        # make end func callable
-        experiment['run_args']['end_func'] = eval(experiment['run_args']['end_func'])
-        path = f'data/{experiment["name"]}'
-        try:
-            os.makedirs(path)
-        except FileExistsError:
-            print('the experiment folder already exists...')
-        # copy dataset, so that we know which dataset was used
-        np.savez(os.path.join(path, 'dataset.npz'), trn=trn, tst=tst)
-        for i in range(experiment['runs']):
-            print(f'starting run {i}')
-            _, log, _ = run(**experiment['run_args'])
-            with open(os.path.join(path, f'{uuid.uuid4()}.p'), 'wb') as fp:
-                pickle.dump(log, fp)
+    print(f'starting experiment {cfg["name"]}')
+    for i in range(cfg['runs']):
+        for data_path in cfg['datasets']:
+            data_name = os.path.basename(data_path).split('.')[0]
+            for pred in cfg['predictor_types']:
+                print(f'predictor: {pred}, dataset: {data_name}, run: {i}')
+                out_path = os.path.join(cfg["output_dir"], cfg['name'], data_name, pred)
+                try:
+                    os.makedirs(out_path)
+                except FileExistsError:
+                    pass
+                # copy dataset, so that we know which dataset was used
+                np.savez(os.path.join(out_path, 'dataset.npz'), trn=trn, tst=tst)
+                end_func = get_partial_compare_func(cfg['limit_type'], cfg['end_treshold'])
+                load_dataset(data_path)
+                _, log, _ = run(cfg['end_cond'], end_func, pred, cfg['predictor_kw'])
+                with open(os.path.join(out_path, f'{uuid.uuid4()}.p'), 'wb') as fp:
+                    pickle.dump(log, fp)
 
 
-if __name__ == '__main__':
+def main():
     import sys
     if len(sys.argv) < 2:
         print('enter path to config file')
     else:
         run_config(sys.argv[1])
+
+
+if __name__ == '__main__':
+    main()
