@@ -201,7 +201,7 @@ class SchmidtLipsonFPManager(FitnessPredictorManager):
 
 class DrahosovaSekaninaFPManager(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, num_predictors=32, mutpb=0.2, cxpb=1.0,
+    def __init__(self, training_set_size, num_predictors=32, mutpb=0.2, cxpb=0.5,
                  num_trainers=16, generation_period=100, init_read_length=5, **kwargs):
         super().__init__(training_set_size)
         self.predictor_pop = [AdaptiveSizeFitnessPredictor(training_set_size, training_set_size, mutpb, cxpb, init_read_length)
@@ -210,7 +210,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         self.trainers_objective_f = deque([None] * num_trainers)
         self.best_pred = None
         self.best_pred_f = -np.inf
-        self.read_length = init_read_length
+        self._read_length = init_read_length
         self.generation_period = generation_period
 
         self.last_read_length_update_gen = 0
@@ -220,8 +220,18 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
 
         self.training_set_size = training_set_size
 
+    @property
+    def read_length(self):
+        return self._read_length
+
+    @read_length.setter
+    def read_length(self, value):
+        self._read_length = value
+        for p in self.predictor_pop:
+            p.read_length = self._read_length
+        self.best_pred.read_length = self._read_length
+
     def get_best_predictor(self):
-        #print(self.read_length)
         return self.best_pred.test_cases
 
     def next_generation(self, **kwargs):
@@ -251,9 +261,8 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
                                                      kwargs['toolbox'])
         obj_f = None
         # time to update read_length
-        # TODO: 5000 is way too small to make any difference
         if self.last_gen_subjective_fitness is None \
-           or sub_f >= self.last_gen_subjective_fitness \
+           or sub_f > self.last_gen_subjective_fitness \
            or kwargs['gen'] - self.last_read_length_update_gen >= 1000:
             obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
                                                          kwargs['target_values'],
@@ -266,9 +275,9 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
             inaccuracy = sub_f.values[0] / obj_f.values[0]
             self.update_read_length(velocity, inaccuracy)
 
-            self.last_gen_subjective_fitness = sub_f
             self.last_read_length_update_gen = kwargs['gen']
-            self.last_read_length_update_objective_fitness = obj_f
+            self.last_read_length_update_objective_fitness = copy.deepcopy(obj_f)
+        self.last_gen_subjective_fitness = copy.deepcopy(sub_f)
 
         # check if we want to add a new trainer
         # get subjective fitness of the whole trainers population
@@ -300,26 +309,22 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         # over-fitting
         if inaccuracy < 1 / 1.75:
             c = 1.2
-        # predictors are accurate enough
-        elif abs(inaccuracy - 1) <= 0.2:
-            c = 1.0
         # stagnation
         elif abs(velocity) <= 0.001:
             c = 0.9
         # detoriation
         elif velocity > 0:
-            c = 0.9
+            c = 0.96
         # improvement
+        elif -0.1 <= velocity < 0:
+            c = 1.07
         else:
-            c = 1.1
-        self.read_length = int(round(self.read_length * c))
-        self.read_length = max(5, self.read_length)
-        self.read_length = min(self.read_length, self.training_set_size)
+            c = 1.0
+        next_read_length = int(round(self.read_length * c))
+        self.next_read_length = max(5, next_read_length)
+        self.next_read_length = min(next_read_length, self.training_set_size)
 
-        for p in self.predictor_pop:
-            p.read_length = self.read_length
-        self.best_pred.read_length = self.read_length
-        #print(self.read_length)
+        self.read_length = next_read_length
 
     def add_fitness_trainer(self, t, obj_f):
         self.trainers_pop.pop()
@@ -332,7 +337,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         # update best predictor
         for p, f in fitnesses.items():
             if f > self.best_pred_f:
-                self.best_pred_f = f
+                self.best_pred_f = copy.deepcopy(f)
                 self.best_pred = copy.deepcopy(p)
         ret = []
         for _ in range(n):
@@ -371,3 +376,16 @@ class DynamicRandom(FitnessPredictorManager):
 
     def next_generation(self, **kwargs):
         self.pred.random_predictor()
+
+
+class InsertNameHere(FitnessPredictorManager):
+    # TODO: implement my idea in this class
+    def __init__(self, training_set_size, init_size=10, **kwargs):
+        self.pred = FitnessPredictor(training_set_size, init_size, test_cases=np.linspace(0, training_set_size - 1, dtype=int))
+        last_obj_f = None
+
+    def get_best_predictor(self):
+        return self.pred.test_cases
+
+    def next_generation(self, **kwargs):
+        ...
