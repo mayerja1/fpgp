@@ -60,14 +60,16 @@ def predictor_histogram(training_set, training_vals, log):
 
 # methods is a list of lists of dicts
 def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
-                        method_names=[], xlabel=None, ylabel=None, ignore_tresh=1e6):
-    fig, ax = plt.subplots()
+                        method_names=[], xlabel=None, ylabel=None, ignore_tresh=1e6,
+                        fig=None, ax=None, title=None):
+    if fig is None or ax is None:
+        fig, ax = plt.subplots()
     # get range of values
     if min_x is None or max_x is None:
         min_x, max_x = np.inf, -np.inf
         for method in methods:
-            min_x = min(min_x, *[l['logbook'].select(x)[0] for l in method])
-            max_x = max(max_x, *[l['logbook'].select(x)[-1] for l in method])
+            min_x = min(min_x, np.min([l['logbook'].select(x)[0] for l in method]))
+            max_x = max(max_x, np.max([l['logbook'].select(x)[-1] for l in method]))
     points = np.linspace(min_x, max_x, num_points)
     xlabel = x if xlabel is None else xlabel
     ylabel = y if ylabel is None else ylabel
@@ -81,6 +83,8 @@ def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
         vals[vals > ignore_tresh] = np.nan
         plt.errorbar(points, np.nanmean(vals, axis=0), yerr=np.nanstd(vals, axis=0), capsize=2, marker='x', ms=5)
     ax.legend(method_names)
+    if title is not None:
+        ax.set_title(title)
 
 
 def show_performance(log, x, y):
