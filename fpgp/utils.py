@@ -88,24 +88,20 @@ class LoadedLogs:
 def get_results(path):
     logs, names = [], []
     for fname in os.listdir(path):
+        if fname.startswith('.'):
+            continue
         full_path = os.path.join(path, fname)
         if os.path.isdir(os.path.join(path, fname)):
             logs.append(LoadedLogs(full_path))
             names.append(fname)
-    return logs, names
+    return tuple(logs), tuple(names)
 
 
-def create_1d_dataset(fname, func, description, x1, x2):
-    trn_x = np.linspace(x1, x2, 200)
-    trn_y = func(trn_x)
-    tst_x = np.concatenate([trn_x, np.random.random(200) * (x2 - x1) + x1])
-    tst_y = func(tst_x)
-    trn = np.column_stack([trn_x, trn_y])
-    tst = np.column_stack([tst_x, tst_y])
-    np.savez(fname, trn=trn, tst=tst, description=description)
+def create_1d_dataset(fname, func, description, x1, x2, trn_points, tst_add_points):
+    create_nd_dataset(fname, func, description, [(x1, x2)], trn_points, tst_add_points)
 
 
-def create_nd_dataset(fname, func, description, intervals, num_points):
+def create_nd_dataset(fname, func, description, intervals, trn_points, tst_add_points):
 
     def random_points(n):
         points = np.zeros((n, len(intervals)))
@@ -113,13 +109,13 @@ def create_nd_dataset(fname, func, description, intervals, num_points):
             points[:, i] = np.random.rand(n) * (int_[1] - int_[0]) + int_[0]
         return points
 
-    ranges = [np.linspace(*int, num_points) for int in intervals]
+    ranges = [np.linspace(*int, trn_points) for int in intervals]
     trn_x = np.array(np.meshgrid(*ranges)).T.reshape(-1, len(ranges))
     trn_y = func(*trn_x.T)
 
     trn = np.column_stack([trn_x, trn_y])
 
-    tst_x = np.row_stack([trn_x, random_points(len(trn_x))])
+    tst_x = np.row_stack([trn_x, random_points(tst_add_points)])
     tst_y = func(*tst_x.T)
 
     tst = np.column_stack([tst_x, tst_y])
@@ -131,11 +127,31 @@ def get_statistic_from_logs(stat_func, select_func, logs):
     return stat_func([select_func(l) for l in logs])
 
 
+def save_stats(fname, benchmarks):
+    stats = {}
+    for exp_dir in benchmarks:
+        logs, names = get_results(exp_dir)
+        meds = []
+        avgs = []
+        for l, name in zip(logs, names):
+            med = get_statistic_from_logs(np.median, lambda l: l['logbook'].select('test_set_f')[-1], l)
+            avg = get_statistic_from_logs(np.mean, lambda l: l['logbook'].select('test_set_f')[-1], l)
+            meds.append(med)
+            avgs.append(avg)
+        stats[exp_dir.split('/')[-1]] = {'meds': meds, 'avgs': avgs}
+
+    with open(fname, 'wb') as f:
+        stats = pickle.dump(stats, f)
+
+
 if __name__ == '__main__':
     #create_dataset('datasets/f1', lambda x: x**2 - x**3, 'f(x) = x^2 - x^3', -5, 5)
     #create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2*PI*x)', -3, 3)
+    create_1d_dataset('datasets/f6', lambda x: np.exp(np.abs(x))*np.sin(x), 'f(x) = e^|x| * sin(x)', -10, 10, trn_points=200, tst_add_points=200)
     #create_dataset('datasets/f3', lambda x: x**2*np.exp(np.sin(x)) + x + np.sin(np.pi/4 - x**3), 'f(x) = x^2 * e^sin(x) + x + sin(PI/4 - x^3)', -10, 10)
     #create_dataset('datasets/f4', lambda x: np.exp(-x) * x**3 * np.sin(x) * np.cos(x) * (np.sin(x)**2 * np.cos(x) - 1), 'f(x) = e^(-x) * x^3 * sin(x) * cos(x) * (sin(x)^2 * cos(x) - 1)', 0, 10)
     #create_dataset('datasets/f5', lambda x: 10 / ((x - 3)**2 + 5), 'f(x) = 10 / ((x - 3)^2 + 5)', -2, 8)
     #create_dataset('datasets/moje', lambda x: (x - 1000)**2 + 1000, '(x - 1000)^2 + 1000', -10, 10)
-    create_nd_dataset('', lambda x, y: np.add(x, y), '', [(-1, 1), (2, 3)], 5)
+    #create_nd_dataset('datasets/f6', lambda x, y: np.sin(x * y) + (x**2 - y**2) * np.exp(x) / (np.abs(np.log(np.abs(y))) + 1), 'f(x, y) = sin(xy) + (x^2 - y^2) * e^x / (|ln(|y|)| + 1)', [(-10, 10), (-10, 10)], 50, 1000)
+    #create_nd_dataset('datasets/f6', lambda x, y: np.exp(-0.5*(x**2 + y**2)) / np.sqrt(4*np.pi**2), '2d normal distribution', [(-5, 5), (-5, 5)], 80, 200)
+    pass
