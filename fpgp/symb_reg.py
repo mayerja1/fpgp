@@ -211,9 +211,12 @@ def individual_fitness(ind, points, target, toolbox):
 
 
 def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, training_set, test_set, halloffame,
-                     stats=None, verbose=__debug__, epsilon=1e-3):
+                     stats=None, verbose=__debug__, epsilon=0, time_limit=np.inf):
 
     def _terminate():
+        # timeout
+        if time.time() - start_time >= time_limit:
+            return True
         # check convergence
         if len(halloffame) > 0:
             nonlocal best_sol_vals
@@ -224,7 +227,8 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
                 return True
         # check given condition
         vars_name_mapping = {'gen': gen, 'evals': _POINT_EVALS, 'time': time.time() - start_time,
-                             'best_fitness': halloffame[0].fitness.values if len(halloffame) > 0 else np.inf}
+                             'best_fitness': halloffame[0].fitness.values if len(halloffame) > 0 else np.inf,
+                             'test_set_f': test_set_f}
         return end_func(vars_name_mapping[end_cond])
 
     logbook = tools.Logbook()
@@ -233,6 +237,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
     gen = 0
     pred_evals = 0
     start_time = time.time()
+    test_set_f = np.inf
 
     last_predictor = None
 
@@ -248,7 +253,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     # Begin the generational process
     while not _terminate():
-        #print('{:.2e}, {}'.format(_POINT_EVALS, gen), end='\r')
+        print('{:.2e}, {}'.format(_POINT_EVALS, gen), end='\r')
         gen += 1
         # get points to use
         tmp = _POINT_EVALS
@@ -296,8 +301,6 @@ def symb_reg_initialize(arity):
     pset = symb_reg_pset.init_pset(arity)
     toolbox = symb_reg_toolbox.init_toolbox(pset)
 
-    
-
     toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("compile", gp.compile, pset=pset)
@@ -322,7 +325,7 @@ def symb_reg_initialize(arity):
     return toolbox, mstats
 
 
-def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', predictor_kw={}, epsilon=1e-3, arity=1):
+def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact', run_kw={}, predictor_kw={}, arity=1):
     toolbox, stats = symb_reg_initialize(arity)
     pop = toolbox.population(POP_SIZE)
     hof = tools.HallOfFame(1)
@@ -331,12 +334,13 @@ def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact',
                   'SLcoev': fitness_pred.SchmidtLipsonFPManager(len(trn), **predictor_kw),
                   'DScoev': fitness_pred.DrahosovaSekaninaFPManager(len(trn), **predictor_kw),
                   'static': fitness_pred.StaticRandom(len(trn), **predictor_kw),
-                  'dynamic': fitness_pred.DynamicRandom(len(trn), **predictor_kw)
+                  'dynamic': fitness_pred.DynamicRandom(len(trn), **predictor_kw),
+                  'JMconstant': fitness_pred.JMConstantSize(len(trn), **predictor_kw)
                   }
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
                                 predictors[fitness_predictor], trn, tst, halloffame=hof,
-                                stats=stats, verbose=False, epsilon=epsilon)
+                                stats=stats, verbose=False, **run_kw)
 
     return pop, log, hof
 
@@ -370,11 +374,13 @@ def run_config(fname):
                     os.makedirs(out_path)
                 except FileExistsError:
                     pass
+                load_dataset(data_path)
                 # copy dataset, so that we know which dataset was used
                 np.savez(os.path.join(out_path, 'dataset.npz'), trn=trn, tst=tst)
                 end_func = get_partial_compare_func(cfg['limit_type'], cfg['end_treshold'])
-                load_dataset(data_path)
-                _, log, _ = run(cfg['end_cond'], end_func, pred, cfg['predictor_kw'], arity=trn.shape[1] - 1)
+                _, log, _ = run(cfg['end_cond'], end_func, pred,
+                                predictor_kw=cfg['predictor_kw'], arity=trn.shape[1] - 1,
+                                run_kw=cfg['run_kw'])
                 with open(os.path.join(out_path, f'{uuid.uuid4()}.p'), 'wb') as fp:
                     pickle.dump(log, fp)
 

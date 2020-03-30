@@ -61,34 +61,49 @@ def predictor_histogram(training_set, training_vals, log):
 # methods is a list of lists of dicts
 def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
                         method_names=[], xlabel=None, ylabel=None, ignore_tresh=1e6,
-                        fig=None, ax=None, title=None):
+                        fig=None, ax=None, title=None, xscale='linear', stat_type='mean',
+                        errorbars=True):
     if fig is None or ax is None:
         fig, ax = plt.subplots()
     # get range of values
-    if min_x is None or max_x is None:
-        min_x, max_x = np.inf, -np.inf
+    if min_x is None:
+        min_x = np.inf
         for method in methods:
             min_x = min(min_x, np.min([l['logbook'].select(x)[0] for l in method]))
+    if max_x is None:
+        max_x = -np.inf
+        for method in methods:
             max_x = max(max_x, np.max([l['logbook'].select(x)[-1] for l in method]))
-    points = np.linspace(min_x, max_x, num_points)
+    if xscale == 'linear':
+        points = np.linspace(min_x, max_x, num=num_points)
+    elif xscale == 'log':
+        points = np.geomspace(min_x, max_x, num=num_points)
     xlabel = x if xlabel is None else xlabel
     ylabel = y if ylabel is None else ylabel
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    ax.set_xscale(xscale)
     for i, method in enumerate(methods):
         xss, yss = utils.get_xss_yss_from_logbooks([l['logbook'] for l in method], x, y)
         vals = utils.vals_at_points(xss, yss, points)
         if vals[vals > ignore_tresh].size > 0:
             warnings.warn(f'{vals[vals > ignore_tresh].size} values were ignored for being too high')
         vals[vals > ignore_tresh] = np.nan
-        plt.errorbar(points, np.nanmean(vals, axis=0), yerr=np.nanstd(vals, axis=0), capsize=2, marker='x', ms=5)
+        if stat_type == 'mean':
+            stat_func = np.nanmean
+        elif stat_type == 'median':
+            stat_func = np.nanmedian
+        else:
+            raise ValueError('Invalid stat_type (use mean/median)')
+        errors = np.nanstd(vals, axis=0) if errorbars else np.zeros(len(vals[0]))
+        ax.errorbar(points, stat_func(vals, axis=0), yerr=errors, capsize=2, marker='x', ms=5)
     ax.legend(method_names)
     if title is not None:
         ax.set_title(title)
 
 
 def show_performance(log, x, y):
-    compare_performance([[log]], x, y, min_x=min(log.select(x)), max_x=max(log.select(x)), ignore_tresh=np.inf)
+    compare_performance([[log]], x, y, min_x=min(log['logbook'].select(x)), max_x=max(log['logbook'].select(x)), ignore_tresh=np.inf)
 
 
 def two_stats_graph(log, stat1, stat2):
@@ -101,6 +116,7 @@ def two_stats_graph(log, stat1, stat2):
     ax2.plot(log.select('gen')[::step], log.select(stat2)[::step], color='red')
     ax2.set_ylabel(stat2)
     ax2.legend([stat2], loc=1)
+
 
 if __name__ == '__main__':
     import pickle

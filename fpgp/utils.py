@@ -127,6 +127,10 @@ def get_statistic_from_logs(stat_func, select_func, logs):
     return stat_func([select_func(l) for l in logs])
 
 
+def get_attributes_from_logs(logs, atr, idx=-1):
+    return np.array([l['logbook'].select(atr)[idx] for l in logs])
+
+
 def save_stats(fname, benchmarks):
     stats = {}
     for exp_dir in benchmarks:
