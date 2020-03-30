@@ -2,6 +2,7 @@ import random
 import math
 import numpy as np
 import copy
+
 from collections import deque
 
 
@@ -378,14 +379,26 @@ class DynamicRandom(FitnessPredictorManager):
         self.pred.random_predictor()
 
 
-class InsertNameHere(FitnessPredictorManager):
-    # TODO: implement my idea in this class
-    def __init__(self, training_set_size, init_size=10, **kwargs):
-        self.pred = FitnessPredictor(training_set_size, init_size, test_cases=np.linspace(0, training_set_size - 1, dtype=int))
-        last_obj_f = None
+class JMConstantSize(FitnessPredictorManager):
+
+    def __init__(self, training_set_size, pred_size=32, period=500, **kwargs):
+        self.pred = FitnessPredictor(training_set_size, pred_size)
+        self.period = period
 
     def get_best_predictor(self):
         return self.pred.test_cases
 
     def next_generation(self, **kwargs):
-        ...
+        if kwargs['gen'] % self.period == 1:
+            # evaluate population on whole training set
+            population_values = np.array([ind.eval_at_points(kwargs['training_set']) for ind in kwargs['pop']])
+            assert(population_values.shape == (len(kwargs['pop']), len(kwargs['training_set'])))
+            training_set_fitnesses = [kwargs['toolbox'].evaluate(vals - kwargs['target_values']) for vals in population_values]
+            mean_abs_errors = np.average(np.abs(population_values - kwargs['target_values']), axis=0)
+            assert(len(mean_abs_errors) == len(kwargs['training_set']))
+            # replace test case with lowest error with the one with highest
+            lowest_error_test = np.argmin(mean_abs_errors[self.pred.test_cases])
+            for er, tst_idx in sorted(zip(mean_abs_errors, range(len(mean_abs_errors))), reverse=True):
+                if tst_idx not in self.pred.test_cases:
+                    self.pred.test_cases[lowest_error_test] = tst_idx
+                    break
