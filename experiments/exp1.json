@@ -1,0 +1,15 @@
+[
+  {
+    "predictor_types": ["exact", "SLcoev", "DScoev", "MyPred2", "dynamic", "static"],
+    "predictor_names": [],
+    "predictor_kw": {"pred_size": 32},
+    "limit_type": "ge",
+    "end_treshold": 1e7,
+    "end_cond": "evals",
+    "run_kw": {},
+    "datasets": ["datasets/f1.npz", "datasets/f2.npz", "datasets/f3.npz", "datasets/f4.npz", "datasets/f5.npz", "datasets/yachts.npz"],
+    "name": "exp1",
+    "output_dir": "data/",
+    "runs": 50
+  }
+]

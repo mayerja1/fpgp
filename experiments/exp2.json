@@ -1,0 +1,67 @@
+[
+  {
+    "predictor_types": ["exact", "SLcoev", "DScoev", "MyPred2", "dynamic", "static"],
+    "predictor_names": [],
+    "predictor_kw": {"pred_size": 32},
+    "limit_type": "le",
+    "end_treshold": 0.01,
+    "end_cond": "test_set_f",
+    "run_kw": {"time_limit": 300},
+    "datasets": ["datasets/f1.npz"],
+    "name": "exp2",
+    "output_dir": "data/",
+    "runs": 50
+  },
+  {
+    "predictor_types": ["exact", "SLcoev", "DScoev", "MyPred2", "dynamic", "static"],
+    "predictor_names": [],
+    "predictor_kw": {"pred_size": 32},
+    "limit_type": "le",
+    "end_treshold": 0.5,
+    "end_cond": "test_set_f",
+    "run_kw": {"time_limit": 300},
+    "datasets": ["datasets/f2.npz"],
+    "name": "exp2",
+    "output_dir": "data/",
+    "runs": 50
+  },
+  {
+    "predictor_types": ["exact", "SLcoev", "DScoev", "MyPred2", "dynamic", "static"],
+    "predictor_names": [],
+    "predictor_kw": {"pred_size": 32},
+    "limit_type": "le",
+    "end_treshold": 1.5,
+    "end_cond": "test_set_f",
+    "run_kw": {"time_limit": 300},
+    "datasets": ["datasets/f3.npz"],
+    "name": "exp2",
+    "output_dir": "data/",
+    "runs": 50
+  },
+  {
+    "predictor_types": ["exact", "SLcoev", "DScoev", "MyPred2", "dynamic", "static"],
+    "predictor_names": [],
+    "predictor_kw": {"pred_size": 32},
+    "limit_type": "le",
+    "end_treshold": 0.025,
+    "end_cond": "test_set_f",
+    "run_kw": {"time_limit": 300},
+    "datasets": ["datasets/f4.npz"],
+    "name": "exp2",
+    "output_dir": "data/",
+    "runs": 50
+  },
+  {
+    "predictor_types": ["exact", "SLcoev", "DScoev", "MyPred2", "dynamic", "static"],
+    "predictor_names": [],
+    "predictor_kw": {"pred_size": 32},
+    "limit_type": "le",
+    "end_treshold": 0.025,
+    "end_cond": "test_set_f",
+    "run_kw": {"time_limit": 300},
+    "datasets": ["datasets/f5.npz"],
+    "name": "exp2",
+    "output_dir": "data/",
+    "runs": 50
+  }
+]
