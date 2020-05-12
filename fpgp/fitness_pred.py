@@ -65,10 +65,10 @@ class EvolvingFitnessPredictor(FitnessPredictor):
 class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
 
     def __init__(self, training_set_size, size, mutpb, cxpb, init_read_length, test_cases=None):
+        self.read_length = init_read_length
         super().__init__(training_set_size, size, mutpb, cxpb, test_cases=test_cases)
         self._cxpb = cxpb
         self._mutpb = mutpb
-        self.read_length = init_read_length
 
     @property
     def test_cases(self):
@@ -84,14 +84,29 @@ class AdaptiveSizeFitnessPredictor(EvolvingFitnessPredictor):
 
 
 class FitnessPredictorManager():
+    '''
+    Base class to use fitness predictors during the evolution
+    To implement your own method of constructing the predictors,
+    derive from this class and implement following methods.
+    '''
 
     def __init__(self, training_set_size):
         self.training_set_size = training_set_size
 
     def get_best_predictor(self):
+        '''
+        Return the predictors that will be used by GP in the current generation.
+        Return type: numpy array (n,), dtype=int
+        '''
         raise NotImplementedError()
 
     def next_generation(self, **kwargs):
+        '''
+        This method is run every generation. If inner state of the class needs
+        to be updated (i.e. to a find better predictor), this is a way to do it.
+        kwargs contain useful info about current state of the evolution, for example
+        current generation, current population etc.
+        '''
         raise NotImplementedError()
 
 
@@ -110,7 +125,7 @@ class ExactFitness(FitnessPredictorManager):
 
 class SchmidtLipsonFPManager(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, pred_size=8, num_predictors=8,
+    def __init__(self, training_set_size, pred_size=32, num_predictors=8,
                  mutpb=0.1, cxpb=0.5, num_trainers=10, effort_tresh=0.05, new_trainer_period=100, **kwargs):
         self.predictor_pop = [EvolvingFitnessPredictor(training_set_size, pred_size, mutpb, cxpb)
                               for _ in range(num_predictors)]
@@ -322,8 +337,8 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
         else:
             c = 1.0
         next_read_length = int(round(self.read_length * c))
-        self.next_read_length = max(5, next_read_length)
-        self.next_read_length = min(next_read_length, self.training_set_size)
+        next_read_length = max(5, next_read_length)
+        next_read_length = min(next_read_length, self.training_set_size)
 
         self.read_length = next_read_length
 
@@ -357,7 +372,7 @@ class DrahosovaSekaninaFPManager(FitnessPredictorManager):
 
 class StaticRandom(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, pred_size=8, **kwargs):
+    def __init__(self, training_set_size, pred_size=32, **kwargs):
         self.pred = FitnessPredictor(training_set_size, pred_size)
 
     def get_best_predictor(self):
@@ -369,7 +384,7 @@ class StaticRandom(FitnessPredictorManager):
 
 class DynamicRandom(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, pred_size=8, **kwargs):
+    def __init__(self, training_set_size, pred_size=32, **kwargs):
         self.pred = FitnessPredictor(training_set_size, pred_size)
 
     def get_best_predictor(self):
@@ -379,26 +394,105 @@ class DynamicRandom(FitnessPredictorManager):
         self.pred.random_predictor()
 
 
-class JMConstantSize(FitnessPredictorManager):
+class MyPred2(FitnessPredictorManager):
 
-    def __init__(self, training_set_size, pred_size=32, period=500, **kwargs):
+    def __init__(self, training_set_size, pred_size=5, period=100, **kwargs):
         self.pred = FitnessPredictor(training_set_size, pred_size)
         self.period = period
 
+        self.last_read_length_update_gen = 0
+        self.last_read_length_update_objective_fitness = None
+
+        self.last_gen_subjective_fitness = None
+
     def get_best_predictor(self):
+        #print(len(self.pred.test_cases))
         return self.pred.test_cases
 
     def next_generation(self, **kwargs):
+
+        sub_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'][self.get_best_predictor()],
+                                                     kwargs['target_values'][self.get_best_predictor()],
+                                                     kwargs['toolbox'])
+        new_size = self.pred.size
+        sorted_test_cases = None
+        # update the size
+        if self.last_gen_subjective_fitness is None \
+           or sub_f > self.last_gen_subjective_fitness \
+           or kwargs['gen'] - self.last_read_length_update_gen >= 1000:
+
+            obj_f = kwargs['toolbox'].individual_fitness(kwargs['best_solution'], kwargs['training_set'],
+                                                         kwargs['target_values'],
+                                                         kwargs['toolbox'])
+            if kwargs['gen'] > 1:
+                velocity = kwargs['toolbox'].fitness_diff(obj_f, self.last_read_length_update_objective_fitness)[0] / (kwargs['gen'] - self.last_read_length_update_gen)
+            else:
+                velocity = 1
+
+            inaccuracy = sub_f.values[0] / obj_f.values[0]
+            new_size = self.new_size(velocity, inaccuracy)
+
+            self.last_read_length_update_gen = kwargs['gen']
+            self.last_read_length_update_objective_fitness = copy.deepcopy(obj_f)
+        self.last_gen_subjective_fitness = copy.deepcopy(sub_f)
+
+        size_diff = new_size - self.pred.size
+        if size_diff < 0:
+            self.pred = FitnessPredictor(self.pred.training_set_size, new_size, test_cases=self.pred.test_cases[:new_size])
+        elif size_diff > 0:
+            sorted_test_cases = self.sorted_test_cases_idx_wrt_WMAE(kwargs)
+            new_test_cases = np.append(self.pred.test_cases, -np.ones(size_diff, dtype=int))
+            test_case_idx = 0
+            for i in range(new_size - size_diff, new_size):
+                while sorted_test_cases[test_case_idx] in new_test_cases:
+                    test_case_idx += 1
+                new_test_cases[i] = sorted_test_cases[test_case_idx]
+            assert(np.all(new_test_cases >= 0))
+            self.pred = FitnessPredictor(self.pred.training_set_size, new_size, new_test_cases)
+
+        # periodically replace 'useless' test cases
         if kwargs['gen'] % self.period == 1:
-            # evaluate population on whole training set
-            population_values = np.array([ind.eval_at_points(kwargs['training_set']) for ind in kwargs['pop']])
-            assert(population_values.shape == (len(kwargs['pop']), len(kwargs['training_set'])))
-            training_set_fitnesses = [kwargs['toolbox'].evaluate(vals - kwargs['target_values']) for vals in population_values]
-            mean_abs_errors = np.average(np.abs(population_values - kwargs['target_values']), axis=0)
-            assert(len(mean_abs_errors) == len(kwargs['training_set']))
-            # replace test case with lowest error with the one with highest
-            lowest_error_test = np.argmin(mean_abs_errors[self.pred.test_cases])
-            for er, tst_idx in sorted(zip(mean_abs_errors, range(len(mean_abs_errors))), reverse=True):
-                if tst_idx not in self.pred.test_cases:
-                    self.pred.test_cases[lowest_error_test] = tst_idx
-                    break
+            if sorted_test_cases is None:
+                sorted_test_cases = self.sorted_test_cases_idx_wrt_WMAE(kwargs)
+            test_cases_set = set(self.pred.test_cases)
+            to_be_replaced = -1
+            for x in reversed(sorted_test_cases):
+                if x in test_cases_set:
+                    tmp, = np.where(self.pred.test_cases == x)
+                    assert(len(tmp == 1))
+                    to_be_replaced = tmp[0]
+            assert(to_be_replaced != -1)
+            for i in sorted_test_cases:
+                if i not in self.pred.test_cases:
+                    self.pred.test_cases[to_be_replaced] = i
+
+    def new_size(self, velocity, inaccuracy):
+        # over-fitting
+        if inaccuracy < 1 / 1.75:
+            c = 1.2
+        # stagnation
+        elif abs(velocity) <= 0.001:
+            c = 0.9
+        # detoriation
+        elif velocity > 0:
+            c = 0.96
+        # improvement
+        elif -0.1 <= velocity < 0:
+            c = 1.07
+        else:
+            c = 1.0
+        #print(c)
+        cur_size = self.pred.size
+        next_size = int(round(cur_size * c))
+        next_size = max(5, next_size)
+        next_size = min(next_size, self.pred.training_set_size)
+        return next_size
+
+    def sorted_test_cases_idx_wrt_WMAE(self, kwargs):
+        population_values = np.array([ind.eval_at_points(kwargs['training_set']) for ind in kwargs['pop']])
+        assert(population_values.shape == (len(kwargs['pop']), len(kwargs['training_set'])))
+        obj_fitnesses = np.array([kwargs['toolbox'].evaluate(e)[0] for e in population_values - kwargs['target_values']])
+        mean_abs_errors_weightened = np.average(np.abs(population_values - kwargs['target_values']), weights=1/obj_fitnesses, axis=0)
+        sorted_ = sorted(zip(mean_abs_errors_weightened, range(len(mean_abs_errors_weightened))), reverse=True)
+        assert(len(mean_abs_errors_weightened) == len(kwargs['training_set']))
+        return np.array([i for _, i in sorted_])
