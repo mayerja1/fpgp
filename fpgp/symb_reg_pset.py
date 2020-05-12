@@ -1,13 +1,9 @@
 import math
 import operator
 import safe_functions as sf
-import random
+
 
 from deap import gp
-
-
-def rand101():
-    return random.randint(-1, 1)
 
 
 def init_pset(arity):
@@ -24,7 +20,9 @@ def init_pset(arity):
     pset.addPrimitive(sf.safe_exp, 1)
     pset.addPrimitive(sf.safe_log, 1)
 
-    pset.addEphemeralConstant("rand101", rand101)
     pset.addTerminal("pi", math.pi)
+    pset.addTerminal("0", 0)
+    pset.addTerminal("1", 1)
+    pset.addTerminal("-1", -1)
 
     return pset

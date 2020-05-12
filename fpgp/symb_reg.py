@@ -253,7 +253,7 @@ def symb_reg_with_fp(population, toolbox, cxpb, mutpb, end_cond, end_func, fp, t
 
     # Begin the generational process
     while not _terminate():
-        print('{:.2e}, {}'.format(_POINT_EVALS, gen), end='\r')
+        #print('{:.2e}, {}'.format(_POINT_EVALS, test_set_f), end='\r')
         gen += 1
         # get points to use
         tmp = _POINT_EVALS
@@ -335,7 +335,7 @@ def run(end_cond='gen', end_func=lambda x: x >= 1000, fitness_predictor='exact',
                   'DScoev': fitness_pred.DrahosovaSekaninaFPManager(len(trn), **predictor_kw),
                   'static': fitness_pred.StaticRandom(len(trn), **predictor_kw),
                   'dynamic': fitness_pred.DynamicRandom(len(trn), **predictor_kw),
-                  'JMconstant': fitness_pred.JMConstantSize(len(trn), **predictor_kw)
+                  'MyPred2': fitness_pred.MyPred2(len(trn), **predictor_kw)
                   }
 
     pop, log = symb_reg_with_fp(pop, toolbox, CXPB, MUTPB, end_cond, end_func,
@@ -362,27 +362,32 @@ def run_config(fname):
             exit(1)
 
     with open(fname, 'r') as fp:
-        cfg = json.load(fp)
-    print(f'starting experiment {cfg["name"]}')
-    for i in range(cfg['runs']):
-        for data_path in cfg['datasets']:
-            data_name = os.path.basename(data_path).split('.')[0]
-            for pred in cfg['predictor_types']:
-                print(f'predictor: {pred}, dataset: {data_name}, run: {i}')
-                out_path = os.path.join(cfg["output_dir"], cfg['name'], data_name, pred)
-                try:
-                    os.makedirs(out_path)
-                except FileExistsError:
-                    pass
-                load_dataset(data_path)
-                # copy dataset, so that we know which dataset was used
-                np.savez(os.path.join(out_path, 'dataset.npz'), trn=trn, tst=tst)
-                end_func = get_partial_compare_func(cfg['limit_type'], cfg['end_treshold'])
-                _, log, _ = run(cfg['end_cond'], end_func, pred,
-                                predictor_kw=cfg['predictor_kw'], arity=trn.shape[1] - 1,
-                                run_kw=cfg['run_kw'])
-                with open(os.path.join(out_path, f'{uuid.uuid4()}.p'), 'wb') as fp:
-                    pickle.dump(log, fp)
+        exps = json.load(fp)
+    for cfg in exps:
+        print(f'starting experiment {cfg["name"]}')
+        for i in range(cfg['runs']):
+            for data_path in cfg['datasets']:
+                data_name = os.path.basename(data_path).split('.')[0]
+                if cfg['predictor_names'] == []:
+                    pred_names = cfg['predictor_types']
+                else:
+                    pred_names = cfg['predictor_names']
+                for pred, pred_name in zip(cfg['predictor_types'], pred_names):
+                    print(f'predictor: {pred}, dataset: {data_name}, run: {i}')
+                    out_path = os.path.join(cfg["output_dir"], cfg['name'], data_name, pred_name)
+                    try:
+                        os.makedirs(out_path)
+                    except FileExistsError:
+                        pass
+                    load_dataset(data_path)
+                    # copy dataset, so that we know which dataset was used
+                    np.savez(os.path.join(out_path, 'dataset.npz'), trn=trn, tst=tst)
+                    end_func = get_partial_compare_func(cfg['limit_type'], cfg['end_treshold'])
+                    _, log, _ = run(cfg['end_cond'], end_func, pred,
+                                    predictor_kw=cfg['predictor_kw'], arity=trn.shape[1] - 1,
+                                    run_kw=cfg['run_kw'])
+                    with open(os.path.join(out_path, f'{uuid.uuid4()}.p'), 'wb') as fp:
+                        pickle.dump(log, fp)
 
 
 def main():

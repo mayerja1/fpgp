@@ -74,7 +74,7 @@ class LoadedLogs:
         return self._path
 
     def get_logs_from_folder(self):
-        for l in os.listdir(self.path):
+        for l in sorted(os.listdir(self.path)):
             if l.split('.')[-1] != 'p':
                 continue
             try:
@@ -150,12 +150,8 @@ def save_stats(fname, benchmarks):
 
 if __name__ == '__main__':
     #create_dataset('datasets/f1', lambda x: x**2 - x**3, 'f(x) = x^2 - x^3', -5, 5)
-    #create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2*PI*x)', -3, 3)
-    create_1d_dataset('datasets/f6', lambda x: np.exp(np.abs(x))*np.sin(x), 'f(x) = e^|x| * sin(x)', -10, 10, trn_points=200, tst_add_points=200)
-    #create_dataset('datasets/f3', lambda x: x**2*np.exp(np.sin(x)) + x + np.sin(np.pi/4 - x**3), 'f(x) = x^2 * e^sin(x) + x + sin(PI/4 - x^3)', -10, 10)
+    #create_dataset('datasets/f2', lambda x: np.exp(np.abs(x))*np.sin(2*np.pi*x), 'f(x) = e^|x| * sin(2 \pi *x)', -3, 3)
+    #create_dataset('datasets/f3', lambda x: x**2*np.exp(np.sin(x)) + x + np.sin(np.pi/4 - x**3), 'f(x) = x^2 * e^{\sin (x)} + x + \sin (\frac{\pi}{4 - x^3)', -10, 10)
     #create_dataset('datasets/f4', lambda x: np.exp(-x) * x**3 * np.sin(x) * np.cos(x) * (np.sin(x)**2 * np.cos(x) - 1), 'f(x) = e^(-x) * x^3 * sin(x) * cos(x) * (sin(x)^2 * cos(x) - 1)', 0, 10)
     #create_dataset('datasets/f5', lambda x: 10 / ((x - 3)**2 + 5), 'f(x) = 10 / ((x - 3)^2 + 5)', -2, 8)
-    #create_dataset('datasets/moje', lambda x: (x - 1000)**2 + 1000, '(x - 1000)^2 + 1000', -10, 10)
-    #create_nd_dataset('datasets/f6', lambda x, y: np.sin(x * y) + (x**2 - y**2) * np.exp(x) / (np.abs(np.log(np.abs(y))) + 1), 'f(x, y) = sin(xy) + (x^2 - y^2) * e^x / (|ln(|y|)| + 1)', [(-10, 10), (-10, 10)], 50, 1000)
-    #create_nd_dataset('datasets/f6', lambda x, y: np.exp(-0.5*(x**2 + y**2)) / np.sqrt(4*np.pi**2), '2d normal distribution', [(-5, 5), (-5, 5)], 80, 200)
     pass

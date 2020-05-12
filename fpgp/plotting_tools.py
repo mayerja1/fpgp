@@ -4,6 +4,21 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import animation
 import warnings
+from functools import partial
+
+
+_latex_names = {
+    'SLcoev': '$CSP$',
+    'DScoev': '$ASP$',
+    'exact': '$GP_{std}$',
+    'dynamic': '$RP_{dynamic}$',
+    'static': '$RP_{static}$',
+    'my2': '$DP$'
+}
+
+
+def names_to_latex(names):
+    return tuple([_latex_names[n] if n in _latex_names else n for n in names])
 
 
 def visualize_run(training_set, train_vals, log, step=1, freq=100):
@@ -39,14 +54,15 @@ def visualize_run(training_set, train_vals, log, step=1, freq=100):
     return ani
 
 
-def predictor_histogram(training_set, training_vals, log):
-    predictors = log.select('predictor')
+def predictor_histogram(training_set, training_vals, logs, ax1=None):
+    predictors = [np.concatenate(log['logbook'].select('predictor')) for log in logs]
 
     used_tests_idxs = np.concatenate(predictors)
     used_tests = training_set[used_tests_idxs]
     hist, bin_edges = np.histogram(used_tests, bins=len(training_set))
 
-    fig, ax1 = plt.subplots()
+    if ax1 is None:
+        fig, ax1 = plt.subplots()
     ax1.bar(bin_edges[:-1], hist, width=training_set[1] - training_set[2], alpha=0.5, align='edge')
     ax1.set_ylabel('point usage')
     ax1.legend(['usage'], loc=2)
@@ -62,7 +78,7 @@ def predictor_histogram(training_set, training_vals, log):
 def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
                         method_names=[], xlabel=None, ylabel=None, ignore_tresh=1e6,
                         fig=None, ax=None, title=None, xscale='linear', stat_type='mean',
-                        errorbars=True):
+                        vals_errors_func=lambda x: (np.nanmean(x, axis=0), np.nanstd(x, axis=0)), legend=True):
     if fig is None or ax is None:
         fig, ax = plt.subplots()
     # get range of values
@@ -83,23 +99,21 @@ def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_xscale(xscale)
+    lines = []
     for i, method in enumerate(methods):
         xss, yss = utils.get_xss_yss_from_logbooks([l['logbook'] for l in method], x, y)
         vals = utils.vals_at_points(xss, yss, points)
         if vals[vals > ignore_tresh].size > 0:
             warnings.warn(f'{vals[vals > ignore_tresh].size} values were ignored for being too high')
         vals[vals > ignore_tresh] = np.nan
-        if stat_type == 'mean':
-            stat_func = np.nanmean
-        elif stat_type == 'median':
-            stat_func = np.nanmedian
-        else:
-            raise ValueError('Invalid stat_type (use mean/median)')
-        errors = np.nanstd(vals, axis=0) if errorbars else np.zeros(len(vals[0]))
-        ax.errorbar(points, stat_func(vals, axis=0), yerr=errors, capsize=2, marker='x', ms=5)
-    ax.legend(method_names)
+        vals_, errors = vals_errors_func(vals)
+        err_cont = ax.errorbar(points, vals_, yerr=errors, capsize=2, marker='x', ms=5)
+        lines.append(err_cont.lines[0])
+    if legend:
+        ax.legend(method_names)
     if title is not None:
         ax.set_title(title)
+    return lines
 
 
 def show_performance(log, x, y):

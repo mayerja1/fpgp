@@ -25,5 +25,4 @@ def init_toolbox(pset):
 
 
 if __name__ == '__main__':
-    c = creator.FitnessMin((2,))
-    print(c.values)
+    pass
