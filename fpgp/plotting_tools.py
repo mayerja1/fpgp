@@ -13,7 +13,8 @@ _latex_names = {
     'exact': '$GP_{std}$',
     'dynamic': '$RP_{dynamic}$',
     'static': '$RP_{static}$',
-    'my2': '$DP$'
+    'my2': '$DP$',
+    'MyPred2': '$DP$'
 }
 
 
@@ -78,7 +79,8 @@ def predictor_histogram(training_set, training_vals, logs, ax1=None):
 def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
                         method_names=[], xlabel=None, ylabel=None, ignore_tresh=1e6,
                         fig=None, ax=None, title=None, xscale='linear', stat_type='mean',
-                        vals_errors_func=lambda x: (np.nanmean(x, axis=0), np.nanstd(x, axis=0)), legend=True):
+                        vals_errors_func=lambda x: (np.nanmean(x, axis=0), np.nanstd(x, axis=0)),
+                        plot_kwargs=None, legend=True):
     if fig is None or ax is None:
         fig, ax = plt.subplots()
     # get range of values
@@ -94,20 +96,22 @@ def compare_performance(methods, x, y, min_x=None, max_x=None, num_points=10,
         points = np.linspace(min_x, max_x, num=num_points)
     elif xscale == 'log':
         points = np.geomspace(min_x, max_x, num=num_points)
+    if plot_kwargs is None:
+        plot_kwargs = len(methods) * [{}]
     xlabel = x if xlabel is None else xlabel
     ylabel = y if ylabel is None else ylabel
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_xscale(xscale)
     lines = []
-    for i, method in enumerate(methods):
+    for method, plot_kw in zip(methods, plot_kwargs):
         xss, yss = utils.get_xss_yss_from_logbooks([l['logbook'] for l in method], x, y)
         vals = utils.vals_at_points(xss, yss, points)
         if vals[vals > ignore_tresh].size > 0:
             warnings.warn(f'{vals[vals > ignore_tresh].size} values were ignored for being too high')
         vals[vals > ignore_tresh] = np.nan
         vals_, errors = vals_errors_func(vals)
-        err_cont = ax.errorbar(points, vals_, yerr=errors, capsize=2, marker='x', ms=5)
+        err_cont = ax.errorbar(points, vals_, yerr=errors, capsize=2, **plot_kw)
         lines.append(err_cont.lines[0])
     if legend:
         ax.legend(method_names)
